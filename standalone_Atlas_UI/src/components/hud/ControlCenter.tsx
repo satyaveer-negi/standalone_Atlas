@@ -1,17 +1,24 @@
 import { useState, useEffect } from "react";
 import { activePackageRegistry, RegistryPackage } from "../../services/packageRegistry";
 import { activeRuntimeManager } from "../../implementations/runtimeManager";
+import { activePlatformDebugger, DebugEvent, DebugTransaction, BreakpointType } from "../../services/platformDebugger";
 
 interface ControlCenterProps {
   onClose: () => void;
 }
 
-type ActiveWorkspace = "docs" | "registry" | "runtime" | "explorer" | "observability" | "governance";
+type ActiveWorkspace = "docs" | "registry" | "runtime" | "explorer" | "observability" | "governance" | "debugger";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("docs");
   const [packages, setPackages] = useState<RegistryPackage[]>([]);
   const [mockLogs, setMockLogs] = useState<string[]>([]);
+  const [debuggerState, setDebuggerState] = useState(activePlatformDebugger.state);
+  const [timeline, setTimeline] = useState<DebugEvent[]>(activePlatformDebugger.timeline);
+  const [transactions, setTransactions] = useState<DebugTransaction[]>(activePlatformDebugger.transactions);
+  const [bpType, setBpType] = useState<BreakpointType>("Event");
+  const [bpTarget, setBpTarget] = useState("simulation.completed");
+
   const [benchmarks, setBenchmarks] = useState({
     cpu: 18,
     memory: 242,
@@ -24,7 +31,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
 
-    // Simulated observability metrics fluctuation
     const interval = setInterval(() => {
       setBenchmarks(prev => ({
         cpu: Math.floor(15 + Math.random() * 8),
@@ -51,6 +57,38 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       ...prev,
       `[Registry] Package "${id}" transition: ${currentStatus} -> ${nextStatus} succeeded.`
     ]);
+  };
+
+  // 🎛️ Debugger Handlers
+  const handleTriggerBP = () => {
+    activePlatformDebugger.setBreakpoint(bpType, bpTarget);
+    activePlatformDebugger.triggerBreakpointHit();
+    setDebuggerState(activePlatformDebugger.state);
+    setTimeline([...activePlatformDebugger.timeline]);
+    setMockLogs(prev => [
+      ...prev,
+      `[Debugger] Breakpoint HIT on [${bpType}] target: "${bpTarget}". Execution PAUSED.`,
+      `[Debugger] Paused payload details: { id: "evt-402", causationId: "parent-33", provenance: "openfoam" }`
+    ]);
+  };
+
+  const handleResume = () => {
+    activePlatformDebugger.resumeExecution();
+    setDebuggerState(activePlatformDebugger.state);
+    setTimeline([...activePlatformDebugger.timeline]);
+    setMockLogs(prev => [...prev, `[Debugger] Execution resumed. Step modes complete.`]);
+  };
+
+  const handleStep = (mode: string) => {
+    if (mode === "Event") activePlatformDebugger.stepEvent();
+    else if (mode === "Runtime") activePlatformDebugger.stepRuntime();
+    else activePlatformDebugger.stepCommit();
+
+    setDebuggerState("STEPPING");
+    setMockLogs(prev => [...prev, `[Debugger] Stepped through Knowledge Flow: Step ${mode} execution.`]);
+    setTimeout(() => {
+      setDebuggerState("PAUSED");
+    }, 600);
   };
 
   return (
@@ -112,6 +150,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🕸️ AIR & AKG Explorer
+          </button>
+          <button
+            onClick={() => setActiveTab("debugger")}
+            className={`w-full text-left px-3 py-2 rounded text-xs transition-all ${
+              activeTab === "debugger"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-cyan-500/30 text-cyan-200 font-semibold"
+            }`}
+          >
+            🎛️ Knowledge Debugger
           </button>
           <button
             onClick={() => setActiveTab("observability")}
@@ -294,6 +342,139 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <div className="flex justify-between text-[11px]">
                     <span className="text-slate-400">Active Transactions:</span>
                     <span className="text-emerald-400 font-mono">14</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "debugger" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-purple-300">🎛️ KNOWLEDGE FLOW DEBUGGER</h3>
+                  <p className="text-[10px] text-slate-500">Audit, inspect, and step through transaction lifetimes and events</p>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={bpType}
+                    onChange={(e) => setBpType(e.target.value as BreakpointType)}
+                    className="bg-slate-900 border border-purple-500/30 rounded px-2 py-0.5 text-purple-300 text-[10px]"
+                  >
+                    <option value="Event">Event Breakpoint</option>
+                    <option value="Runtime">Runtime Breakpoint</option>
+                    <option value="AKG">AKG Commit Breakpoint</option>
+                  </select>
+                  <button
+                    onClick={handleTriggerBP}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-2 py-0.5 rounded text-[10px]"
+                  >
+                    Trigger Breakpoint
+                  </button>
+                </div>
+              </div>
+
+              {/* Step Mode Controllers & Status */}
+              <div className="bg-slate-900/60 p-3 rounded border border-purple-500/20 flex justify-between items-center text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-400">State:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    debuggerState === "PAUSED" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/20 text-emerald-300"
+                  }`}>
+                    {debuggerState}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleStep("Event")}
+                    disabled={debuggerState !== "PAUSED"}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                  >
+                    Step Event
+                  </button>
+                  <button
+                    onClick={() => handleStep("Runtime")}
+                    disabled={debuggerState !== "PAUSED"}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                  >
+                    Step Runtime
+                  </button>
+                  <button
+                    onClick={() => handleStep("Commit")}
+                    disabled={debuggerState !== "PAUSED"}
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                  >
+                    Step Commit
+                  </button>
+                  <button
+                    onClick={handleResume}
+                    disabled={debuggerState !== "PAUSED"}
+                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-1 rounded text-[10px] font-bold"
+                  >
+                    Continue ▶️
+                  </button>
+                </div>
+              </div>
+
+              {/* Event Timeline Sequence */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
+                <span className="font-bold text-slate-300">Sequential Event Timeline Stream</span>
+                <div className="flex items-center gap-2 mt-2 font-mono text-[10px]">
+                  {timeline.map((e, index) => (
+                    <div key={index} className="flex items-center gap-1.5">
+                      {index > 0 && <span className="text-slate-600">&rarr;</span>}
+                      <span className={`px-2 py-1 rounded border ${
+                        e.status === "PAUSED"
+                          ? "bg-red-500/20 text-red-300 border-red-500/40 animate-pulse font-bold"
+                          : e.status === "COMPLETED"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-slate-800 text-slate-500 border-slate-700"
+                      }`}>
+                        {e.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Provenance & Transactions logs side by side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
+                  <span className="font-bold text-slate-300">Transaction History Log</span>
+                  <div className="flex flex-col gap-1.5 text-[10px] font-mono mt-1">
+                    {transactions.map(t => (
+                      <div key={t.id} className="border-b border-slate-800/60 pb-1.5">
+                        <div className="flex justify-between font-bold text-purple-300">
+                          <span>Tx #{t.id} [{t.packageName}]</span>
+                          <span>{t.timestamp}</span>
+                        </div>
+                        <ul className="list-disc pl-4 text-slate-400 mt-1 text-[9px] leading-tight">
+                          {t.mutations.map((m, idx) => <li key={idx}>{m}</li>)}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
+                  <span className="font-bold text-slate-300">Auditable Provenance Metadata</span>
+                  <div className="flex flex-col gap-2 text-[10px] mt-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Triggering Event SHA:</span>
+                      <span className="font-mono text-slate-200">sha256-f8319e09</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Causation Parent Event:</span>
+                      <span className="font-mono text-slate-200">parent-event-382</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Creator Component:</span>
+                      <span className="font-mono text-slate-200">knowledgeRuntime</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Validated Signatures:</span>
+                      <span className="text-emerald-400 font-bold">YES (PLATINUM CERTIFIED)</span>
+                    </div>
                   </div>
                 </div>
               </div>
