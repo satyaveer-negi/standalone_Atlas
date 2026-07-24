@@ -43,7 +43,13 @@ export class RuntimeManager {
       const runtime = this.runtimes.get(name);
       if (runtime) {
         console.log(`[Runtime Manager] Transitioning "${name}" to INITIALIZING...`);
-        await runtime.initialize();
+        const mockContext = {
+          services: {},
+          eventBus: {},
+          knowledgeGraph: {},
+          runtimeManager: this
+        };
+        await runtime.initialize(mockContext);
         console.log(`[Runtime Manager] Transitioning "${name}" to LOADING...`);
         await runtime.load();
         console.log(`[Runtime Manager] Transitioning "${name}" to ACTIVE...`);

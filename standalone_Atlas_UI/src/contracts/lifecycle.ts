@@ -1,3 +1,11 @@
+// 💼 FROZEN PLATFORM CONTEXT STRUCTURE
+export interface PlatformContext {
+  services: any;
+  eventBus: any;
+  knowledgeGraph: any;
+  runtimeManager: any;
+}
+
 // 🚦 FROZEN RUNTIME STATES SPECIFICATION
 export type RuntimeState =
   | "UNLOADED"
@@ -14,7 +22,7 @@ export type RuntimeState =
 export interface RuntimeLifecycle {
   currentState: RuntimeState;
   dependencies: string[];
-  initialize(): Promise<void>;
+  initialize(context: PlatformContext): Promise<void>;
   load(): Promise<void>;
   activate(): Promise<void>;
   shutdown(): Promise<void>;

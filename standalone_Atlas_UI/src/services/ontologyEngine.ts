@@ -193,9 +193,9 @@ export class KnowledgeRuntime implements RuntimeLifecycle {
   }
 
   // 🔄 Lifecycle Implementations
-  public async initialize(): Promise<void> {
+  public async initialize(context: any): Promise<void> {
     this.currentState = "INITIALIZING";
-    console.log("[KnowledgeRuntime] Running lifecycle: initialize()");
+    console.log("[KnowledgeRuntime] Running lifecycle: initialize(context)", context);
   }
 
   public async load(): Promise<void> {
