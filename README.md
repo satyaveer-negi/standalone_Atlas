@@ -1,96 +1,56 @@
-# Standalone Atlas Execution Engine
+# Atlas Enterprise Platform — Reference Architecture v6.5
 
-Atlas is a high-performance decoupled engineering execution portal designed to run, validate, and track CFD and FEA simulations. It connects externally with a parent Project Management System (or any external system) using standard HTTP webhook events.
+Atlas is an **Engineering Operating System & Living Engineering Digital Twin Platform** centered on an **Enterprise Knowledge Graph**, an **Append-Only Command Stream Event Engine**, a **Canonical Architecture Model (CAM)**, a **Canonical Twin Schema (CTS)**, a **Twin Query Language (TQL)**, a **Plugin Simulation Framework**, a **Tri-Capability Predictive Engine**, a **Blackboard Multi-Agent System**, an **Enterprise Governance Engine**, and a centralized **Mission Control Dashboard**.
 
-## Architecture Layout
+> [!IMPORTANT]
+> **Architecture Baseline v6.5 Frozen**  
+> The architectural contracts (CAM, CTS, TQL, Decision Package, Extension SDK, Connector SDK, Governance Config, Lifecycle Model) are considered stable. Future development should extend these contracts rather than redefine them.
+
+---
+
+## 🏛️ Frozen Platform Reference Architecture
 
 ```
-+------------------------------------+          +------------------------------------+
-|  Project Management System         |          |  Standalone Atlas System           |
-|  (FE: Port 5173 / BE: Port 8000)   |          |  (FE: Port 5174 / BE: Port 8001)   |
-|                                    |          |                                    |
-|   +----------------------------+   |          |   +----------------------------+   |
-|   |  Webhook Receiver Endpoint |<--+----------+---|  Simulation Webhook Trigger|   |
-|   |  (atlas_integration_webhook|   | HTTP POST|   |  (dispatch_external_event) |   |
-|   +----------------------------+   |          |   +----------------------------+   |
-+------------------------------------+          +------------------------------------+
+                             Atlas Enterprise Platform v6.5
+
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Govern │ Observe │ Explore │ Studio │ Deploy │ Analytics │ Agent │ Ecosystem │ Enterprise │ Digital Twin │ Dev Portal │ Mission Control │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+                                                 │
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                             Operational Governance & Platform Mission Control
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ Platform Lifecycle Manager │ Configurable Quality Gates │ Domain CLI │ Code & Test Health Telemetry │ Mission Control HUD
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                                                 │
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                             Living Engineering Digital Twin Layer (V6)
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ Canonical Twin Schema (CTS) │ Twin Kernel │ Twin Event Bus │ Twin Query Language (TQL) │ Decision Packages │ Blackboard Agents
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                                                 │
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                             Engineering Operating System Layer (V5)
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ Autonomous AI Agent │ Workflow DAG Engine │ Deployment Intelligence │ Analytics Engine │ Extension Runtime SDK v2.5
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                                                 │
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                             Enterprise Foundation Layer (V5.9)
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ Identity │ Multi-Tenant Hierarchy (Org/BU/Workspace/Project) │ Hybrid ABAC/RBAC │ Search Engine │ Notifications Engine
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                                                 │
+════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+                                   Atlas Core Engine v2.0 (Frozen)
 ```
 
 ---
 
-## 🛠️ Getting Started & Setup
+## 📑 Architecture Governance & Semantic Versioning
 
-### 1. Standalone Backend (Django API)
+- **`6.5.x`**: Implementation improvements, performance optimizations, bug fixes, connector updates.
+- **`6.6`**: Feature releases extending existing SDK v2.5 and CTS contracts without breaking changes.
+- **`7.0`**: Next baseline release for major architectural paradigms (e.g., Engineering Intent Platform).
 
-The backend exposes execution endpoints for scheduling simulation runs, managing datasets, and publishing completion payloads externally.
-
-#### Setup Instructions:
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Set up and activate a virtual environment:
-   ```bash
-   python -m venv .venv
-   # Windows:
-   .venv\Scripts\activate
-   # Linux/macOS:
-   source .venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install django django-cors-headers djangorestframework requests django-dotenv
-   ```
-4. Run migrations:
-   ```bash
-   python manage.py migrate
-   ```
-5. Set environment variables (Optional, defaults to local port 8000 webhook):
-   ```env
-   PM_WEBHOOK_URL=http://127.0.0.1:8000/api/v1/integrations/atlas/event/
-   ```
-6. Start the server on port **8001**:
-   ```bash
-   python manage.py runserver 8001
-   ```
-
----
-
-### 2. Standalone Frontend (Vite + React)
-
-The frontend is a lightweight, responsive dashboard presenting the digital twin workspace, simulation graphs, and active compute states.
-
-#### Setup Instructions:
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-2. Install npm dependencies:
-   ```bash
-   npm install
-   ```
-3. Run the development server (runs automatically on port **5174**):
-   ```bash
-   npm run dev
-   ```
-
----
-
-## 📡 Webhook Integration Specifications
-
-Atlas notifies your Project Management System using clean POST payloads. Whenever a simulation runs and completes, the backend publishes the following structure:
-
-### `SimulationCompleted` Event
-```json
-{
-  "event_type": "SimulationCompleted",
-  "payload": {
-    "run_id": "84c8a2b5ef1a2e99d1469e847c2b0c3f",
-    "job_id": "550e8400-e29b-41d4-a716-446655440000",
-    "file_path": "/storage/runs/84c8a2b5ef1a2e99d1469e847c2b0c3f/output.h5",
-    "file_hash": "a8fd8cdb1a2e99d1469e847c2b0c3fa8fd8cdb1"
-  },
-  "timestamp": "2026-07-24T12:00:00Z"
-}
-```
-If your external system receives this payload, it can automatically update the status of the related issue or baseline documentation!
+See the [Architecture Decision Record Index](file:///d:/erp_chatgpt/erp_project/frontend/src/modules/atlas/docs/ADR_INDEX.md) for detailed rationale across ADR-001 through ADR-012.
