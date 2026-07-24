@@ -24,8 +24,7 @@ import { DependencyFlowEngine } from "../../graphics/effects/DependencyFlowEngin
 import { SimulationEngine, DEMO_SIMULATION_FLOWS } from "../../graphics/effects/SimulationEngine";
 import { ConnectionBeam } from "../../graphics/effects/ConnectionBeam";
 import AtlasPostFX from "../../graphics/postprocessing/AtlasPostFX";
-import { getProjects } from "../../../../features/projects/api/projects";
-import { getWorkspaces } from "../../../../features/workspaces/api/workspaces";
+import { getProjects, getWorkspaces } from "../../services/pmApi";
 
 function CameraZoomTracker() {
   const setZoomLevel = useAtlasStore((state) => state.setZoomLevel);

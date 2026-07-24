@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getProjects } from "../../../../features/projects/api/projects";
-import { getWorkspaces } from "../../../../features/workspaces/api/workspaces";
+import { getProjects, getWorkspaces } from "../../services/pmApi";
 import { useAtlasStore } from "../../store/atlasStore";
 
 function SpatialRadarMinimap() {
