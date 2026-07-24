@@ -5,6 +5,7 @@ import type { ExplorationMode } from "../../store/atlasStore";
 import { activeKnowledgeRuntime } from "../../services/ontologyEngine";
 import { activePackageValidator } from "../../implementations/packageValidator";
 import { activeRuntimeManager } from "../../implementations/runtimeManager";
+import { ControlCenter } from "./ControlCenter";
 import { MissionControlPalette } from "./MissionControlPalette";
 import { ComplianceDashboard } from "../../products/govern/ui/ComplianceDashboard";
 import { ObserveDashboard } from "../../products/observe/ui/ObserveDashboard";
@@ -105,6 +106,7 @@ export default function TopBar({
   const [showSettings, setShowSettings] = useState(false);
   const [showGovern, setShowGovern] = useState(false);
   const [showObserve, setShowObserve] = useState(false);
+  const [showControlCenter, setShowControlCenter] = useState(false);
   const [showExplore, setShowExplore] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [showSimulate, setShowSimulate] = useState(false);
@@ -247,6 +249,13 @@ export default function TopBar({
             className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-cyan-500/30 to-blue-500/30 border border-cyan-500/50 text-cyan-200 text-[11px] font-mono font-bold hover:from-cyan-500/40 hover:to-blue-500/40 transition-all cursor-pointer flex items-center gap-1"
           >
             <span>📈 OBSERVE</span>
+          </button>
+
+          <button
+            onClick={() => setShowControlCenter(true)}
+            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-cyan-500/30 to-purple-500/30 border border-purple-500/50 text-purple-200 text-[11px] font-mono font-bold hover:from-cyan-500/40 hover:to-purple-500/40 transition-all cursor-pointer flex items-center gap-1"
+          >
+            <span>⚙️ CONTROL CENTER</span>
           </button>
 
           <button
@@ -541,8 +550,11 @@ export default function TopBar({
       {/* Atlas V5 AI Engineering Agent Autonomous Workspace */}
       {showAgent && <AgentDashboard onClose={() => setShowAgent(false)} />}
 
-      {/* Atlas V5 Platform Ecosystem Extension Runtime Workspace */}
-      {showEcosystem && <EcosystemDashboard onClose={() => setShowEcosystem(false)} />}
+      {/* Atlas Platform Governance & Mission Control Workspace */}
+      {showMissionControl && <PlatformMissionControlDashboard onClose={() => setShowMissionControl(false)} />}
+
+      {/* Atlas Control Center Dockable Dashboard */}
+      {showControlCenter && <ControlCenter onClose={() => setShowControlCenter(false)} />}
 
       {/* Atlas V5.9 Enterprise Foundation Workspace */}
       {showEnterprise && <EnterpriseDashboard onClose={() => setShowEnterprise(false)} />}
