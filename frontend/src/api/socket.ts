@@ -63,7 +63,7 @@ export const connectCommentsSocket = (
   }
 
   socket = new WebSocket(
-    `${protocol}://127.0.0.1:8000/ws/comments/${taskId}/?token=${token}`,
+    `${protocol}://127.0.0.1:8001/ws/comments/${taskId}/?token=${token}`,
   );
 
   /* ============================
