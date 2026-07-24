@@ -1,5 +1,5 @@
 import React from 'react';
-import { Atlas } from './modules/atlas/Atlas';
+import { Atlas } from './Atlas';
 
 export function App() {
   return (
