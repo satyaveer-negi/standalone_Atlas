@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { AtlasIntermediateRepresentation } from "../services/atlasIntermediateRepresentation";
+import { activeKnowledgeRuntime } from "../services/ontologyEngine";
 
 export type CameraMode =
   | "orbit"
@@ -77,6 +79,8 @@ export interface AtlasState {
   selectedNodeId: string | null;
   focusedNodeId: string | null;
   activeInspectorTab: InspectorTab;
+  activeAIR: AtlasIntermediateRepresentation | null;
+  setActiveAIR: (air: AtlasIntermediateRepresentation) => void;
 
   // Actions
   initialize: () => void;
@@ -162,6 +166,8 @@ export const useAtlasStore = create<AtlasState>((set, get) => ({
   selectedNodeId: "repo-root",
   focusedNodeId: "repo-root",
   activeInspectorTab: "overview",
+  activeAIR: activeKnowledgeRuntime.getActiveAIR() || null,
+  setActiveAIR: (activeAIR) => set({ activeAIR }),
 
   initialize: () =>
     set({

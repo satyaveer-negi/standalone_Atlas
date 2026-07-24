@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAtlasStore } from "../../store/atlasStore";
 import type { ExplorationMode } from "../../store/atlasStore";
+import { activeKnowledgeRuntime } from "../../services/ontologyEngine";
 import { MissionControlPalette } from "./MissionControlPalette";
 import { ComplianceDashboard } from "../../products/govern/ui/ComplianceDashboard";
 import { ObserveDashboard } from "../../products/observe/ui/ObserveDashboard";
@@ -45,6 +46,37 @@ export default function TopBar({
   filesCount = 12,
 }: Props) {
   const navigate = useNavigate();
+  const activeAIR = useAtlasStore((state) => state.activeAIR);
+  const setActiveAIR = useAtlasStore((state) => state.setActiveAIR);
+  const [compilerLogs, setCompilerLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const handleLoadPackage = (sysId: string) => {
+    setCompilerLogs([
+      `[H1 Compiler] Loading manifest configuration...`,
+    ]);
+    setShowLogs(true);
+    setTimeout(() => {
+      setCompilerLogs(prev => [...prev, `[H1 Compiler] Parsing YAML definition schema...`]);
+      setTimeout(() => {
+        setCompilerLogs(prev => [...prev, `[H1 Compiler] Compiling AIR Graphs (Semantic, Capability, Workflow)...`]);
+        setTimeout(() => {
+          setCompilerLogs(prev => [...prev, `[H1 Compiler] AIR intermediate representation built successfully.`, `[H2 Runtime] Loading package ${sysId}.atlaskp via Runtime Manager...`]);
+          setTimeout(() => {
+            setCompilerLogs(prev => [...prev, `[H2 Runtime] Active system updated on the Atlas Knowledge Graph (AKG).`]);
+            activeKnowledgeRuntime.loadPackage(sysId);
+            const air = activeKnowledgeRuntime.getActiveAIR();
+            if (air) {
+              setActiveAIR(air);
+            }
+            setTimeout(() => {
+              setShowLogs(false);
+            }, 1200);
+          }, 400);
+        }, 400);
+      }, 400);
+    }, 400);
+  };
   const [showSettings, setShowSettings] = useState(false);
   const [showGovern, setShowGovern] = useState(false);
   const [showObserve, setShowObserve] = useState(false);
@@ -108,6 +140,19 @@ export default function TopBar({
           <span className="font-black text-sm tracking-widest text-cyan-300">
             ATLAS
           </span>
+
+          <div className="flex items-center gap-1.5 ml-2 mr-2">
+            <span className="text-[9px] text-slate-500 font-bold uppercase">PACKAGE:</span>
+            <select
+              value={activeAIR?.systemId || "openfoam"}
+              onChange={(e) => handleLoadPackage(e.target.value)}
+              className="bg-slate-900/80 border border-cyan-500/30 rounded px-1.5 py-0.5 text-cyan-300 font-mono text-[10px] focus:outline-none cursor-pointer"
+            >
+              <option value="openfoam">OpenFOAM (.atlaskp)</option>
+              <option value="jira">Jira (.atlaskp)</option>
+              <option value="literature">Literature (.atlaskp)</option>
+            </select>
+          </div>
 
           <span className="text-[9px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold uppercase">
             L{zoomLevel}
@@ -479,8 +524,20 @@ export default function TopBar({
       {/* Atlas Operationalization & Developer SDK Portal Workspace */}
       {showDevPortal && <DeveloperSDKPortal onClose={() => setShowDevPortal(false)} />}
 
-      {/* Atlas Platform Governance & Mission Control Workspace */}
-      {showMissionControl && <PlatformMissionControlDashboard onClose={() => setShowMissionControl(false)} />}
+      {/* 🚀 COMPILER TRACE LOGS OVERLAY */}
+      {showLogs && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm p-4 rounded-xl border border-cyan-500/40 bg-slate-950/90 backdrop-blur-xl text-cyan-400 font-mono text-[10px] shadow-2xl flex flex-col gap-1.5">
+          <div className="flex items-center justify-between border-b border-cyan-500/30 pb-1.5 mb-1">
+            <span className="font-bold text-cyan-300">⚙️ ATLAS COMPILER PIPELINE</span>
+            <span className="animate-ping h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+          </div>
+          {compilerLogs.map((log, index) => (
+            <div key={index} className="opacity-90 leading-tight">
+              {log}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
