@@ -62,8 +62,11 @@ export const connectCommentsSocket = (
     socket.close();
   }
 
+  const defaultWsBase = `${protocol}://${window.location.hostname}:8001`;
+  const wsBase = import.meta.env.VITE_WS_URL || defaultWsBase;
+
   socket = new WebSocket(
-    `${protocol}://127.0.0.1:8001/ws/comments/${taskId}/?token=${token}`,
+    `${wsBase.replace(/\/$/, "")}/ws/comments/${taskId}/?token=${token}`,
   );
 
   /* ============================
