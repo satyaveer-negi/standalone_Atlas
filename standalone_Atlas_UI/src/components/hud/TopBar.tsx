@@ -55,38 +55,38 @@ export default function TopBar({
 
   const handleLoadPackage = (sysId: string) => {
     setCompilerLogs([
-      `[H1 Compiler] Loading manifest configuration...`,
+      `[SDK CLI] atlas create knowledge-pack ${sysId}`,
     ]);
     setShowLogs(true);
     setTimeout(() => {
-      // Validate manifest headers
-      const valResult = activePackageValidator.validatePackage({ id: sysId, version: "1.0.0", ontology: {}, signature: "signed" });
-      setCompilerLogs(prev => [
-        ...prev,
-        `[H1 Compiler] Parsing YAML definition schema...`,
-        `[H1 Compiler] Manifest integrity check: ${valResult.valid ? "PASSED" : "FAILED"}`,
-        `[H1 Compiler] Cryptographic signature verified: ${valResult.signatureVerified ? "YES (TRUSTED PUBLISHER)" : "NO"}`
-      ]);
+      const scaffoldLogs = activePackageValidator.runCreateScaffold(sysId);
+      setCompilerLogs(prev => [...prev, ...scaffoldLogs]);
 
       setTimeout(() => {
-        setCompilerLogs(prev => [...prev, `[H1 Compiler] Compiling AIR Graphs (Semantic, Capability, Workflow)...`]);
+        const testLogs = activePackageValidator.runPackageTests(sysId);
+        setCompilerLogs(prev => [...prev, `[SDK CLI] atlas test ${sysId}`, ...testLogs]);
+
         setTimeout(() => {
+          const valResult = activePackageValidator.validatePackage({ id: sysId, version: "1.0.0", ontology: {}, signature: "signed" });
+          const inspectLogs = activePackageValidator.runInspectDumps(sysId);
           setCompilerLogs(prev => [
             ...prev,
-            `[H1 Compiler] AIR intermediate representation built successfully.`,
-            `[H2 Runtime] Initializing package ${sysId}.atlaskp via Runtime Manager...`
+            `[SDK CLI] atlas inspect ${sysId}`,
+            ...inspectLogs,
+            `[H1 Compiler] Compiling AIR Graphs (Semantic, Capability, Workflow)...`,
+            `[H1 Compiler] AIR compiled. Signature level: ${valResult.signatureVerified ? "GOLD (TRUSTED)" : "BRONZE"}`
           ]);
 
           setTimeout(async () => {
-            // Run topological sorted resolver
             const loadOrder = await activeRuntimeManager.loadAll();
             const doctorLogs = activePackageValidator.runDoctorDiagnostics(sysId);
 
             setCompilerLogs(prev => [
               ...prev,
-              `[Runtime Manager] Dependency load order resolved: [${loadOrder.join(" -> ")}]`,
+              `[Runtime Manager] Load order: [${loadOrder.join(" -> ")}]`,
               ...doctorLogs,
-              `[H2 Runtime] Active system updated on the Atlas Knowledge Graph (AKG).`
+              `[H2 Runtime] Active system loaded onto Atlas Knowledge Graph (AKG).`,
+              `[DocForge] Generated live documentation for ${sysId}.`
             ]);
 
             activeKnowledgeRuntime.loadPackage(sysId);
@@ -96,11 +96,11 @@ export default function TopBar({
             }
             setTimeout(() => {
               setShowLogs(false);
-            }, 1800);
-          }, 400);
-        }, 400);
-      }, 400);
-    }, 400);
+            }, 2500);
+          }, 600);
+        }, 600);
+      }, 600);
+    }, 600);
   };
   const [showSettings, setShowSettings] = useState(false);
   const [showGovern, setShowGovern] = useState(false);
@@ -176,6 +176,10 @@ export default function TopBar({
               <option value="openfoam">OpenFOAM (.atlaskp)</option>
               <option value="jira">Jira (.atlaskp)</option>
               <option value="literature">Literature (.atlaskp)</option>
+              <option value="software">Software (.atlaskp)</option>
+              <option value="research">Research (.atlaskp)</option>
+              <option value="education">Education (.atlaskp)</option>
+              <option value="astronomy">Astronomy (Scaffold E2E...)</option>
             </select>
           </div>
 
