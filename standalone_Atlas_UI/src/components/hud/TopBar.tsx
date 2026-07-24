@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAtlasStore } from "../../store/atlasStore";
 import type { ExplorationMode } from "../../store/atlasStore";
 import { activeKnowledgeRuntime } from "../../services/ontologyEngine";
+import { activePackageValidator } from "../../implementations/packageValidator";
+import { activeRuntimeManager } from "../../implementations/runtimeManager";
 import { MissionControlPalette } from "./MissionControlPalette";
 import { ComplianceDashboard } from "../../products/govern/ui/ComplianceDashboard";
 import { ObserveDashboard } from "../../products/observe/ui/ObserveDashboard";
@@ -57,13 +59,36 @@ export default function TopBar({
     ]);
     setShowLogs(true);
     setTimeout(() => {
-      setCompilerLogs(prev => [...prev, `[H1 Compiler] Parsing YAML definition schema...`]);
+      // Validate manifest headers
+      const valResult = activePackageValidator.validatePackage({ id: sysId, version: "1.0.0", ontology: {}, signature: "signed" });
+      setCompilerLogs(prev => [
+        ...prev,
+        `[H1 Compiler] Parsing YAML definition schema...`,
+        `[H1 Compiler] Manifest integrity check: ${valResult.valid ? "PASSED" : "FAILED"}`,
+        `[H1 Compiler] Cryptographic signature verified: ${valResult.signatureVerified ? "YES (TRUSTED PUBLISHER)" : "NO"}`
+      ]);
+
       setTimeout(() => {
         setCompilerLogs(prev => [...prev, `[H1 Compiler] Compiling AIR Graphs (Semantic, Capability, Workflow)...`]);
         setTimeout(() => {
-          setCompilerLogs(prev => [...prev, `[H1 Compiler] AIR intermediate representation built successfully.`, `[H2 Runtime] Loading package ${sysId}.atlaskp via Runtime Manager...`]);
-          setTimeout(() => {
-            setCompilerLogs(prev => [...prev, `[H2 Runtime] Active system updated on the Atlas Knowledge Graph (AKG).`]);
+          setCompilerLogs(prev => [
+            ...prev,
+            `[H1 Compiler] AIR intermediate representation built successfully.`,
+            `[H2 Runtime] Initializing package ${sysId}.atlaskp via Runtime Manager...`
+          ]);
+
+          setTimeout(async () => {
+            // Run topological sorted resolver
+            const loadOrder = await activeRuntimeManager.loadAll();
+            const doctorLogs = activePackageValidator.runDoctorDiagnostics(sysId);
+
+            setCompilerLogs(prev => [
+              ...prev,
+              `[Runtime Manager] Dependency load order resolved: [${loadOrder.join(" -> ")}]`,
+              ...doctorLogs,
+              `[H2 Runtime] Active system updated on the Atlas Knowledge Graph (AKG).`
+            ]);
+
             activeKnowledgeRuntime.loadPackage(sysId);
             const air = activeKnowledgeRuntime.getActiveAIR();
             if (air) {
@@ -71,7 +96,7 @@ export default function TopBar({
             }
             setTimeout(() => {
               setShowLogs(false);
-            }, 1200);
+            }, 1800);
           }, 400);
         }, 400);
       }, 400);

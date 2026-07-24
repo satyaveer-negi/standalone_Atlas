@@ -1,4 +1,7 @@
 import { AtlasIntermediateRepresentation } from "./atlasIntermediateRepresentation";
+import type { RuntimeLifecycle, RuntimeState } from "../contracts/lifecycle";
+import { container } from "../implementations/serviceContainer";
+import { activeRuntimeManager } from "../implementations/runtimeManager";
 
 export interface EntityType {
   name: string;
@@ -176,7 +179,10 @@ export class KnowledgeCompiler {
 }
 
 // 🌐 PROGRAM H2: KNOWLEDGE RUNTIME
-export class KnowledgeRuntime {
+export class KnowledgeRuntime implements RuntimeLifecycle {
+  public currentState: RuntimeState = "UNLOADED";
+  public dependencies: string[] = ["eventBus", "security"];
+
   private compiler = new KnowledgeCompiler();
   private loadedPackages = new Map<string, AtlasIntermediateRepresentation>();
   private activeSystemId = "openfoam";
@@ -186,6 +192,32 @@ export class KnowledgeRuntime {
     this.loadPackage("openfoam");
   }
 
+  // 🔄 Lifecycle Implementations
+  public async initialize(): Promise<void> {
+    this.currentState = "INITIALIZING";
+    console.log("[KnowledgeRuntime] Running lifecycle: initialize()");
+  }
+
+  public async load(): Promise<void> {
+    this.currentState = "LOADING";
+    console.log("[KnowledgeRuntime] Running lifecycle: load()");
+  }
+
+  public async activate(): Promise<void> {
+    this.currentState = "ACTIVE";
+    console.log("[KnowledgeRuntime] Running lifecycle: activate()");
+  }
+
+  public async shutdown(): Promise<void> {
+    this.currentState = "STOPPING";
+    console.log("[KnowledgeRuntime] Running lifecycle: shutdown()");
+  }
+
+  public async dispose(): Promise<void> {
+    this.currentState = "DISPOSED";
+    console.log("[KnowledgeRuntime] Running lifecycle: dispose()");
+  }
+
   public registerListener(callback: (air: AtlasIntermediateRepresentation) => void) {
     this.listeners.push(callback);
     const active = this.loadedPackages.get(this.activeSystemId);
@@ -193,13 +225,18 @@ export class KnowledgeRuntime {
   }
 
   public loadPackage(systemId: string): void {
+    this.currentState = "VALIDATING";
     const pack = DOMAIN_PACKS[systemId];
-    if (!pack) return;
+    if (!pack) {
+      this.currentState = "FAILED";
+      return;
+    }
 
     // Trigger Compilation toolchain
     const compiledAIR = this.compiler.compile(pack);
     this.loadedPackages.set(systemId, compiledAIR);
     this.activeSystemId = systemId;
+    this.currentState = "ACTIVE";
 
     console.log(`[H2 Runtime] Loaded package "${systemId}" v${pack.version} successfully.`);
     this.listeners.forEach((listener) => listener(compiledAIR));
@@ -211,3 +248,7 @@ export class KnowledgeRuntime {
 }
 
 export const activeKnowledgeRuntime = new KnowledgeRuntime();
+
+// Register onto Service Container & Runtime Manager
+container.register("knowledgeRuntime", activeKnowledgeRuntime);
+activeRuntimeManager.registerRuntime("knowledgeRuntime", activeKnowledgeRuntime);
