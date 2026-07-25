@@ -10,6 +10,9 @@ import { activePackageCertification, CertificationReport } from "../../services/
 import { activeKQLQueryEngine, KQLQueryResult, KQLExplainPlan } from "../../services/kql/parser";
 import { activeToolAdapters, ToolAdapter, AdapterState } from "../../services/adapters/externalToolAdapters";
 import { adapterRegistry } from "../../services/adapters/adapterRegistry";
+import { activeExecutionManager, QueuedJob } from "../../services/runtime/executionManager";
+import "../../services/kql/federatedQueryProvider";
+import "../../services/adapters/remoteExecutionProvider";
 
 interface ControlCenterProps {
   onClose: () => void;
@@ -52,6 +55,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [kqlResult, setKqlResult] = useState<KQLQueryResult | null>(null);
   const [kqlExplain, setKqlExplain] = useState<KQLExplainPlan[] | null>(null);
   const [executionResult, setExecutionResult] = useState<any | null>(null);
+  const [jobsQueue, setJobsQueue] = useState<QueuedJob[]>([]);
+  const [validationMsg, setValidationMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -59,6 +64,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setPolicies(activeSecurityEngine.getPoliciesList());
     setAuditLogs(activeSecurityEngine.getAuditTrail());
     setAdapters(activeToolAdapters.getAdaptersList());
+    setJobsQueue(activeExecutionManager.getQueueList());
 
     const interval = setInterval(() => {
       const updatedMetrics: SubsystemMetrics = {
@@ -149,7 +155,18 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     const plans = activeKQLQueryEngine.explainQuery(kqlQuery);
     setKqlExplain(plans);
     setKqlResult(null);
+    setValidationMsg(null);
     setMockLogs(prev => [...prev, `[KQL Query] Built AST compilation pipeline trace plan.`]);
+  };
+
+  const handleValidateKQL = () => {
+    const cleanQuery = kqlQuery.trim().replace(/\s+/g, " ");
+    const match = cleanQuery.match(/MATCH\s+(\w+)/i);
+    if (!match) {
+      setValidationMsg("Syntax Error: Query must start with MATCH <entity>");
+    } else {
+      setValidationMsg(`Ready to Execute: target entity "${match[1]}" is valid.`);
+    }
   };
 
   const handleToggleAdapter = (name: string, state: AdapterState) => {
@@ -161,16 +178,24 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
   const handleExecuteAdapter = async (name: string) => {
     const key = name.toLowerCase().split(" ")[0];
-    const adapter = adapterRegistry.getAdapter(key);
-    if (adapter) {
-      const res = await adapter.execute("simulation.run");
+    try {
+      const res = await activeExecutionManager.executeJob(key, "simulation.run");
       setExecutionResult(res);
+      setJobsQueue([...activeExecutionManager.getQueueList()]);
       setMockLogs(prev => [
         ...prev,
-        `[Adapter Exec] ${name} run successful. Run ID: ${res.runId}, Duration: ${res.duration}ms.`,
+        `[Adapter Exec] ${name} run successful via Execution Manager. Run ID: ${res.runId}, Duration: ${res.duration}ms.`,
         ...res.logs.map(log => `  -> ${log}`)
       ]);
+    } catch (e: any) {
+      setMockLogs(prev => [...prev, `[Adapter Exec Error] Failed to run ${name}: ${e.message}`]);
     }
+  };
+
+  const handleCancelJob = (jobId: string) => {
+    activeExecutionManager.cancelJob(jobId);
+    setJobsQueue([...activeExecutionManager.getQueueList()]);
+    setMockLogs(prev => [...prev, `[Execution Manager] Cancelled job: "${jobId}".`]);
   };
 
   return (
@@ -747,6 +772,41 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   )}
                 </div>
               )}
+
+              {jobsQueue.length > 0 && (
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded mt-3 text-[10px] flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-400 block border-b border-slate-850 pb-1">Orchestrated Execution Jobs Queue</span>
+                  {jobsQueue.map(job => (
+                    <div key={job.jobId} className="flex justify-between items-center py-1 border-b border-slate-900/60 last:border-0">
+                      <div>
+                        <span className="font-mono font-bold text-slate-300">{job.jobId}</span>
+                        <span className="text-slate-500 font-mono ml-2">[{job.providerKey}] command: "{job.command}" (Retries: {job.retries})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold ${
+                          job.status === "COMPLETED"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : job.status === "FAILED"
+                            ? "bg-red-500/20 text-red-400"
+                            : job.status === "CANCELLED"
+                            ? "bg-slate-800 text-slate-500"
+                            : "bg-amber-500/20 text-amber-400 animate-pulse"
+                        }`}>
+                          {job.status}
+                        </span>
+                        {(job.status === "RUNNING" || job.status === "QUEUED") && (
+                          <button
+                            onClick={() => handleCancelJob(job.jobId)}
+                            className="bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 px-1.5 py-0.5 rounded text-[8px] cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -764,7 +824,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   onChange={(e) => setKqlQuery(e.target.value)}
                   className="bg-slate-900 border border-slate-800 rounded p-2.5 font-mono text-cyan-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-cyan-500/50 w-full h-[50px] resize-none"
                 />
-                <div className="flex gap-2 justify-end">
+                 <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={handleValidateKQL}
+                    className="bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
+                  >
+                    VALIDATE
+                  </button>
                   <button
                     onClick={handleExplainKQL}
                     className="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
@@ -779,6 +845,15 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </button>
                 </div>
               </div>
+
+              {validationMsg && (
+                <div className="p-3.5 bg-slate-905 border border-purple-500/30 rounded text-[10.5px] font-mono">
+                  <span className="font-bold text-purple-300 block mb-1">Query Lint Validator:</span>
+                  <span className={validationMsg.startsWith("Syntax") ? "text-red-400" : "text-emerald-400"}>
+                    {validationMsg}
+                  </span>
+                </div>
+              )}
 
               {kqlResult && (
                 <div className="border border-slate-800 rounded bg-slate-900/60 p-3 mt-2">
