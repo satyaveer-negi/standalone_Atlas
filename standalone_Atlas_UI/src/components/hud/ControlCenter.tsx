@@ -41,6 +41,10 @@ import { activeWorkflowMarketplace } from "../../services/workflow/workflowMarke
 import type { RemoteMarketplacePackage } from "../../services/workflow/workflowMarketplace";
 import { activeTrustManager } from "../../services/workflow/trustManager";
 import { activePackageInstaller } from "../../services/workflow/packageInstaller";
+import { activeCollaborationHub } from "../../services/workflow/workflowCollaboration";
+import type { Comment } from "../../services/workflow/workflowCollaboration";
+import { activeGovernanceEngine } from "../../services/workflow/workflowGovernance";
+import type { UserRole, ApprovalState, AuditRecord } from "../../services/workflow/workflowGovernance";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -118,6 +122,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [marketplaceCatalog, setMarketplaceCatalog] = useState<RemoteMarketplacePackage[]>([]);
   const [selectedMarketplacePackage, setSelectedMarketplacePackage] = useState<RemoteMarketplacePackage | null>(null);
   const [trustBadges, setTrustBadges] = useState<string | null>(null);
+
+  // III.5 States
+  const [currentRole, setCurrentRole] = useState<UserRole>("Author");
+  const [pkgApprovalState, setPkgApprovalState] = useState<ApprovalState>("Draft");
+  const [packageComments, setPackageComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [packageAuditHistory, setPackageAuditHistory] = useState<AuditRecord[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -357,6 +368,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const handleValidateSelected = (pkg: WorkflowPackage) => {
     const report = activeWorkflowValidator.validatePackage(pkg);
     setValidationReport(report);
+
+    // Sync III.5 States
+    setPkgApprovalState(activeGovernanceEngine.getPackageState(pkg.packageId));
+    setPackageComments(activeCollaborationHub.getThread(pkg.packageId).comments);
+    setPackageAuditHistory(activeGovernanceEngine.getAuditHistory(pkg.packageId));
   };
 
   // III.4 Handlers
@@ -371,6 +387,40 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setTrustBadges(`Publisher: ${report.publisher} | Certification: ${report.level} | Details: ${report.details}`);
   };
 
+  // III.5 Handlers
+  const handleAddComment = () => {
+    if (!selectedPackage || !newComment) return;
+    activeCollaborationHub.addComment(selectedPackage.packageId, currentRole, newComment);
+    setPackageComments([...activeCollaborationHub.getThread(selectedPackage.packageId).comments]);
+    setNewComment("");
+  };
+
+  const handleGovernanceAction = (action: "Submit" | "Approve" | "Reject" | "Promote" | "Publish") => {
+    if (!selectedPackage) return;
+    const pkgId = selectedPackage.packageId;
+    let res = false;
+
+    if (action === "Submit") {
+      res = activeGovernanceEngine.submitForReview(pkgId, "HP", currentRole);
+    } else if (action === "Approve") {
+      res = activeGovernanceEngine.reviewPackage(pkgId, "HP", currentRole, true);
+    } else if (action === "Reject") {
+      res = activeGovernanceEngine.reviewPackage(pkgId, "HP", currentRole, false);
+    } else if (action === "Promote") {
+      res = activeGovernanceEngine.promoteToReady(pkgId, "HP", currentRole);
+    } else if (action === "Publish") {
+      res = activeGovernanceEngine.publishPackage(pkgId, "HP", currentRole);
+    }
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Governance Action] "${action}" requested. Status: ${res ? "SUCCESS" : "DENIED"}`
+    ]);
+
+    setPkgApprovalState(activeGovernanceEngine.getPackageState(pkgId));
+    setPackageAuditHistory(activeGovernanceEngine.getAuditHistory(pkgId));
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -383,7 +433,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       <div className="bg-slate-900 px-6 py-2.5 border-b border-cyan-500/30 flex items-center justify-between text-xs">
         <div className="flex items-center gap-3">
           <span className="font-black text-cyan-300 tracking-wider">⚙️ ATLAS PLATFORM STUDIO</span>
-          <span className="text-[10px] text-slate-500">v1.2.0-STABLE</span>
+          <span className="text-[10px] text-slate-505">v1.2.0-STABLE</span>
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
         </div>
         <button
@@ -398,13 +448,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
         {/* 🗂️ Left Workspace Navigation Sidebar */}
         <div className="w-48 bg-slate-900/60 border-r border-slate-800 flex flex-col p-2 gap-1 overflow-y-auto">
           {/* Group 1: Runtime Operations */}
-          <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider">Runtime Operations</span>
+          <span className="text-[9px] text-slate-550 font-bold px-2 py-1 uppercase tracking-wider">Runtime Operations</span>
           <button
             onClick={() => setActiveTab("health")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "health"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🏠 Health
@@ -414,7 +464,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "registry"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             📦 Package Registry
@@ -424,7 +474,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "packages"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             📂 Package Explorer
@@ -434,7 +484,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "runtime"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-850 text-slate-450"
             }`}
           >
             🔄 Runtime Manager
@@ -443,8 +493,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             onClick={() => setActiveTab("adapters")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "adapters"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                ? "bg-cyan-505/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🔌 Tool Hub
@@ -454,7 +504,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "nodes"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🖥️ Node Registry
@@ -467,7 +517,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "kql"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🕸️ KQL Console
@@ -523,7 +573,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "debugger"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🎛️ Debugger
@@ -533,7 +583,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "traces"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             ⏳ Trace History
@@ -543,7 +593,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "observability"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             📊 Observability
@@ -553,7 +603,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "governance"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
+                : "hover:bg-slate-800 text-slate-450"
             }`}
           >
             🛡️ Governance
@@ -622,7 +672,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 </div>
                 <button
                   onClick={() => handleAction("astronomy", "Available")}
-                  className="bg-cyan-500 text-slate-955 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
+                  className="bg-cyan-500 text-slate-950 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
                 >
                   Scaffold Astronomy
                 </button>
@@ -644,7 +694,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           pkg.qualityLevel === "Platinum"
                             ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                            : "bg-cyan-505/20 text-cyan-300 border border-cyan-500/30"
+                            : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
                         }`}>
                           {pkg.qualityLevel}
                         </span>
@@ -701,7 +751,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <div key={p.id} className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-1.5">
                     <span className="font-bold text-slate-200">{p.title}</span>
                     <p className="text-[10px] text-slate-400">{p.description}</p>
-                    <div className="flex justify-between items-center text-[10px] text-slate-500 mt-2 border-t border-slate-800/60 pt-2">
+                    <div className="flex justify-between items-center text-[10px] text-slate-505 mt-2 border-t border-slate-800/60 pt-2">
                       <span>License: <strong>{p.license}</strong></span>
                       <span>Author: <strong>{p.author}</strong></span>
                     </div>
@@ -715,7 +765,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">RUNTIME LIFECYCLE CONTROLLER</h3>
-                <p className="text-[10px] text-slate-500">Component loads orders and dependencies verification</p>
+                <p className="text-[10px] text-slate-550">Component loads orders and dependencies verification</p>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
@@ -900,13 +950,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                             ? "bg-emerald-500/20 text-emerald-400"
                             : a.state === "Connecting"
                             ? "bg-amber-500/20 text-amber-400 animate-pulse"
-                            : "bg-slate-800 text-slate-500"
+                            : "bg-slate-800 text-slate-505"
                         }`}>
                           {a.state}
                         </span>
                       </td>
                       <td className="py-2.5 text-slate-400">{a.lastSync}</td>
-                      <td className="py-2.5 text-slate-505 font-mono text-[10px]">
+                      <td className="py-2.5 text-slate-500 font-mono text-[10px]">
                         {a.capabilities.join(", ")}
                       </td>
                       <td className="py-2.5 text-right flex gap-1.5 justify-end">
@@ -960,7 +1010,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <div key={job.jobId} className="flex justify-between items-center py-1 border-b border-slate-900/60 last:border-0">
                       <div>
                         <span className="font-mono font-bold text-slate-300">{job.jobId}</span>
-                        <span className="text-slate-505 font-mono ml-2">[{job.providerKey}] command: "{job.command}" (Retries: {job.retries})</span>
+                        <span className="text-slate-500 font-mono ml-2">[{job.providerKey}] command: "{job.command}" (Retries: {job.retries})</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold ${
@@ -1019,7 +1069,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </button>
                   <button
                     onClick={handleExecuteKQL}
-                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
                   >
                     EXECUTE QUERY
                   </button>
@@ -1043,7 +1093,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ) : (
                     <table className="w-full text-left border-collapse text-[10px] font-mono">
                       <thead>
-                        <tr className="border-b border-slate-805 text-slate-500">
+                        <tr className="border-b border-slate-800 text-slate-500">
                           {kqlResult.headers.map(h => <th key={h} className="pb-1">{h}</th>)}
                         </tr>
                       </thead>
@@ -1079,11 +1129,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">🖥️ DISTRIBUTED NODE REGISTRY</h3>
-                <p className="text-[10px] text-slate-500">Live heartbeat monitoring and node load metrics</p>
+                <p className="text-[10px] text-slate-550">Live heartbeat monitoring and node load metrics</p>
               </div>
               <table className="w-full text-left border-collapse text-[10px]">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-505 font-bold">
+                  <tr className="border-b border-slate-800 text-slate-500 font-bold">
                     <th className="py-1">Node ID</th>
                     <th className="py-1">Endpoint</th>
                     <th className="py-1">Latency</th>
@@ -1097,18 +1147,18 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   {nodes.map(n => (
                     <tr key={n.nodeId} className="border-b border-slate-900/60 hover:bg-slate-900/20">
                       <td className="py-2.5 font-bold text-slate-200">
-                        {n.name} <div className="text-[9px] text-slate-500 font-mono mt-0.5">{n.capabilities.join(", ")}</div>
+                        {n.name} <div className="text-[9px] text-slate-505 font-mono mt-0.5">{n.capabilities.join(", ")}</div>
                       </td>
                       <td className="py-2.5 font-mono text-slate-400">{n.endpoint}</td>
                       <td className="py-2.5 font-mono text-cyan-400">{n.latency} ms</td>
                       <td className="py-2.5 font-mono">
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                          n.state === "ONLINE" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                          n.state === "ONLINE" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-505"
                         }`}>{n.state}</span>
                       </td>
                       <td className="py-2.5 font-mono text-slate-350">{n.currentLoad}/{n.maxCapacity} MB</td>
                       <td className="py-2.5 font-bold text-cyan-300">{n.healthScore}%</td>
-                      <td className="py-2.5 text-right text-slate-505 font-mono">{n.lastHeartbeat}</td>
+                      <td className="py-2.5 text-right text-slate-500 font-mono">{n.lastHeartbeat}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1124,13 +1174,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               </div>
               <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto">
                 {federationLogs.length === 0 ? (
-                  <span className="text-slate-505 font-mono italic">No active federated queries. Run "MATCH FederatedNode" to test.</span>
+                  <span className="text-slate-500 font-mono italic">No active federated queries. Run "MATCH FederatedNode" to test.</span>
                 ) : (
                   federationLogs.map((log, index) => (
                     <div key={index} className="p-2.5 bg-slate-900 border border-slate-850 rounded flex flex-col gap-1 text-[10px] font-mono">
                       <div className="flex justify-between border-b border-slate-850/60 pb-1">
                         <span className="text-purple-300 font-bold">Stage: {log.stage} (Query ID: {log.queryId})</span>
-                        <span className="text-slate-505">{log.timestamp}</span>
+                        <span className="text-slate-500">{log.timestamp}</span>
                       </div>
                       <p className="text-slate-400 mt-1">{log.details}</p>
                     </div>
@@ -1197,7 +1247,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     >
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-slate-200">{pkg.metadata.packageName}</span>
-                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-505">v{pkg.metadata.version}</span>
+                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-500">v{pkg.metadata.version}</span>
                       </div>
                       <span className="text-[8.5px] text-slate-505 font-mono">Domain: {pkg.metadata.domain} | Author: {pkg.metadata.author}</span>
                       <button
@@ -1205,7 +1255,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                           e.stopPropagation();
                           handleInstantiateWorkflow(pkg.definition.workflowId);
                         }}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] mt-1.5 cursor-pointer w-full"
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-2 py-0.5 rounded text-[9px] mt-1.5 cursor-pointer w-full"
                       >
                         Instantiate
                       </button>
@@ -1230,39 +1280,100 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 </div>
 
-                {/* Panel B: Active Execution & Graph */}
+                {/* Panel B: Governance & Collaboration */}
                 <div className="flex flex-col gap-2.5 border-r border-slate-800/60 pr-4">
-                  <span className="font-bold text-slate-400 text-[10.5px]">B. Execution View (DAG Graph)</span>
-                  {workflowInstances.length === 0 ? (
-                    <span className="text-slate-605 font-mono italic">No active workflow executions.</span>
-                  ) : (
-                    workflowInstances.map(inst => (
-                      <div key={inst.instanceId} className="p-2 bg-slate-900/60 border border-slate-850 rounded flex flex-col gap-1.5">
-                        <span className="font-mono text-[9px] text-cyan-300 block">{inst.instanceId} ({inst.state})</span>
-                        <div className="flex flex-col gap-1.5 mt-1">
-                          {inst.steps.map((step) => (
-                            <div key={step.stepId} className="flex justify-between items-center p-1.5 bg-slate-955/40 border border-slate-900 rounded text-[9.5px]">
-                              <div>
-                                <span className="font-bold text-slate-300">{step.name}</span>
-                                {step.assignedNode && <div className="text-[8px] text-slate-505 font-mono">Node: {step.assignedNode}</div>}
+                  <span className="font-bold text-slate-400 text-[10.5px]">B. Governance & Review Portal</span>
+                  {selectedPackage ? (
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2 text-[9.5px]">
+                      <div className="flex justify-between items-center">
+                        <span>Status: <strong>{pkgApprovalState}</strong></span>
+                        <select
+                          value={currentRole}
+                          onChange={(e) => setCurrentRole(e.target.value as UserRole)}
+                          className="bg-slate-950 border border-slate-800 text-cyan-300 px-1.5 py-0.5 rounded text-[9px]"
+                        >
+                          <option value="Author">Author</option>
+                          <option value="Reviewer">Reviewer</option>
+                          <option value="Publisher">Publisher</option>
+                        </select>
+                      </div>
+
+                      {/* State transitions buttons */}
+                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-850">
+                        <button
+                          onClick={() => handleGovernanceAction("Submit")}
+                          disabled={pkgApprovalState !== "Draft"}
+                          className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-cyan-300 px-2 py-0.5 rounded text-[8.5px] border border-slate-700 cursor-pointer"
+                        >
+                          Submit For Review
+                        </button>
+                        <button
+                          onClick={() => handleGovernanceAction("Approve")}
+                          disabled={pkgApprovalState !== "InReview"}
+                          className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleGovernanceAction("Reject")}
+                          disabled={pkgApprovalState !== "InReview"}
+                          className="bg-red-650 hover:bg-red-500 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => handleGovernanceAction("Promote")}
+                          disabled={pkgApprovalState !== "Approved"}
+                          className="bg-purple-650 hover:bg-purple-550 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
+                        >
+                          Mark Ready
+                        </button>
+                        <button
+                          onClick={() => handleGovernanceAction("Publish")}
+                          disabled={pkgApprovalState !== "ReadyToPublish"}
+                          className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-955 font-bold px-2.5 py-0.5 rounded text-[8.5px] cursor-pointer"
+                        >
+                          Publish Release
+                        </button>
+                      </div>
+
+                      {/* Discussions thread */}
+                      <div className="mt-3 pt-3 border-t border-slate-850">
+                        <span className="font-bold text-slate-450 block mb-1">Collaboration Discussions feed:</span>
+                        <div className="max-h-[100px] overflow-y-auto flex flex-col gap-1.5 mb-2 font-mono text-[8.5px]">
+                          {packageComments.length === 0 ? (
+                            <span className="text-slate-505 italic">No comments yet.</span>
+                          ) : (
+                            packageComments.map(c => (
+                              <div key={c.commentId} className="border-b border-slate-850 pb-1">
+                                <div className="flex justify-between text-[8px] text-slate-500">
+                                  <span>{c.author}</span>
+                                  <span>{c.timestamp}</span>
+                                </div>
+                                <p className="text-slate-300 mt-0.5">{c.text}</p>
                               </div>
-                              {step.state === "Ready" ? (
-                                <button
-                                  onClick={() => handleRunWorkflowStep(inst.instanceId, step.stepId)}
-                                  className="bg-cyan-505 text-cyan-400 hover:bg-cyan-500/20 text-[8.5px] border border-cyan-500/30 py-0.5 px-1 rounded cursor-pointer"
-                                >
-                                  Run
-                                </button>
-                              ) : (
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                                  step.state === "Completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-505"
-                                }`}>{step.state}</span>
-                              )}
-                            </div>
-                          ))}
+                            ))
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Add comment..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            className="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[9px] text-slate-300 focus:outline-none flex-1"
+                          />
+                          <button
+                            onClick={handleAddComment}
+                            className="bg-slate-800 hover:bg-slate-700 text-cyan-300 px-2 py-0.5 rounded text-[9px] border border-slate-700 cursor-pointer"
+                          >
+                            Post
+                          </button>
                         </div>
                       </div>
-                    ))
+                    </div>
+                  ) : (
+                    <span className="text-slate-605 font-mono italic">Select package to view governance review status.</span>
                   )}
                 </div>
 
@@ -1293,26 +1404,26 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     )}
                   </div>
 
-                  {/* Scheduling Inspector */}
+                  {/* Governance Audit timeline */}
                   <div className="flex flex-col gap-2">
-                    <span className="font-bold text-slate-400 text-[10.5px]">D. Scheduling Decision Inspector</span>
-                    {latestDecision ? (
-                      <div className="p-2.5 bg-slate-900 border border-purple-500/30 rounded flex flex-col gap-1 font-mono text-[8.5px]">
-                        <span className="text-purple-300 font-bold">{latestDecision.selectedPolicy}</span>
-                        <div className="flex justify-between mt-1 text-slate-400">
-                          <span>Target: {latestDecision.selectedNode.name}</span>
-                          <span className="text-cyan-400">Score: {latestDecision.score}%</span>
-                        </div>
-                        <p className="text-slate-505 mt-1 leading-snug">{latestDecision.reasoning}</p>
-                        {latestDecision.alternatives.length > 0 && (
-                          <div className="mt-1 border-t border-slate-850/60 pt-1 text-[8px] text-slate-505">
-                            <span>Alternatives: {latestDecision.alternatives.join(", ")}</span>
+                    <span className="font-bold text-slate-400 text-[10.5px]">D. Governance Audit Trail</span>
+                    <div className="bg-slate-900 border border-slate-850 p-2 rounded max-h-[110px] overflow-y-auto flex flex-col gap-1.5 font-mono text-[8.5px]">
+                      {packageAuditHistory.length === 0 ? (
+                        <span className="text-slate-605 italic text-[8.5px]">No audit logs.</span>
+                      ) : (
+                        packageAuditHistory.map(log => (
+                          <div key={log.recordId} className="border-b border-slate-850 pb-1 last:border-0">
+                            <div className="flex justify-between text-[8px]">
+                              <span className={log.status === "SUCCESS" ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                                {log.action} ({log.status})
+                              </span>
+                              <span className="text-slate-505">{log.timestamp}</span>
+                            </div>
+                            <p className="text-slate-405 leading-snug mt-0.5">{log.details}</p>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-slate-605 font-mono italic text-[9px]">No scheduling decisions made yet.</span>
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1359,7 +1470,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       >
                         <div className="flex justify-between text-[9px]">
                           <span className="font-bold">Seq {evt.sequenceNumber} | {evt.eventType}</span>
-                          <span className="text-slate-505">{evt.timestamp}</span>
+                          <span className="text-slate-550">{evt.timestamp}</span>
                         </div>
                       </div>
                     ))
@@ -1402,7 +1513,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </button>
                         <button
                           onClick={handlePlayAllReplay}
-                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-2 py-0.5 rounded text-[9px] cursor-pointer"
+                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] cursor-pointer"
                         >
                           ▶ Play All
                         </button>
@@ -1454,7 +1565,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         <span className="font-bold text-slate-200">{item.package.metadata.packageName}</span>
                         <span className="text-[8px] bg-slate-800 px-1 py-0.5 text-slate-500 rounded font-mono">v{item.package.metadata.version}</span>
                       </div>
-                      <span className="text-[8.5px] text-slate-500">Downloads: {item.downloadsCount}</span>
+                      <span className="text-[8.5px] text-slate-505 font-mono">Downloads: {item.downloadsCount}</span>
                     </div>
                   ))}
                 </div>
@@ -1465,7 +1576,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   {selectedMarketplacePackage ? (
                     <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2 text-[9.5px]">
                       <div>Publisher Key: <span className="font-mono text-cyan-400">{selectedMarketplacePackage.publisherKey}</span></div>
-                      <div>Signature Checksum: <span className="font-mono text-slate-500 text-[8.5px] break-all">{selectedMarketplacePackage.signature}</span></div>
+                      <div>Signature Checksum: <span className="font-mono text-slate-505 text-[8.5px] break-all">{selectedMarketplacePackage.signature}</span></div>
                       
                       {trustBadges && (
                         <div className="mt-2 p-2 bg-slate-950 border border-purple-500/30 rounded text-[8.5px] font-mono leading-relaxed">
@@ -1484,12 +1595,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <span className="font-bold text-slate-400 text-[10.5px]">3. Installer Pipeline Actions</span>
                   {selectedMarketplacePackage ? (
                     <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2">
-                      <p className="text-[9px] text-slate-400 leading-snug">
+                      <p className="text-[9px] text-slate-500 leading-snug">
                         The package installer runs signature checksum matches and capability validations before publishing to your local repository.
                       </p>
                       <button
                         onClick={() => handleInstallMarketplacePackage(selectedMarketplacePackage)}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-1.5 rounded text-[10px] cursor-pointer"
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold py-1.5 rounded text-[10px] cursor-pointer"
                       >
                         Run Package Installation
                       </button>
