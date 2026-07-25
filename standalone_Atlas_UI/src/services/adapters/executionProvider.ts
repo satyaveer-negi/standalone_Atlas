@@ -4,6 +4,9 @@ export interface ExecutionResult {
   status: "SUCCESS" | "ERROR" | "PENDING";
   startedAt: string;
   completedAt: string;
+  duration: number;
+  traceId: string;
+  diagnostics: string;
   logs: string[];
   artifacts: string[];
 }

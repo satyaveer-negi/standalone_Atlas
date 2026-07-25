@@ -18,6 +18,9 @@ export class PythonExecutionProvider implements ExecutionProvider {
       status: "SUCCESS",
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
+      duration: 120,
+      traceId: "tr-py-101",
+      diagnostics: "No script execution warnings.",
       logs: [`Running script task: "${cmd}"`, "Importing numpy...", "Computing eigenvalues..."],
       artifacts: ["result_matrices.json"]
     };
@@ -43,6 +46,9 @@ export class ONLYOFFICEExecutionProvider implements ExecutionProvider {
       status: "SUCCESS",
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
+      duration: 350,
+      traceId: "tr-oo-102",
+      diagnostics: "Document compiled successfully.",
       logs: ["Assembling markdown data streams...", `Compiling document file: "${cmd}"`, "Converting formats..."],
       artifacts: ["compiled_report.pdf", "compiled_report.docx"]
     };
@@ -68,6 +74,9 @@ export class OpenFOAMExecutionProvider implements ExecutionProvider {
       status: "SUCCESS",
       startedAt: new Date().toISOString(),
       completedAt: new Date().toISOString(),
+      duration: 1840,
+      traceId: "tr-foam-103",
+      diagnostics: "Mesh verification finished with 0 skewness errors.",
       logs: [`Executing OpenFOAM command: ${cmd}`, "Resolving finite volumes mesh boundaries...", "Solving navier-stokes iterations..."],
       artifacts: ["residuals.png", "cfd_results.vtk"]
     };

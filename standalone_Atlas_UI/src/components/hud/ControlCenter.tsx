@@ -9,6 +9,7 @@ import { activePerformanceProfiler, SubsystemMetrics } from "../../services/prof
 import { activePackageCertification, CertificationReport } from "../../services/certification/packageCertification";
 import { activeKQLQueryEngine, KQLQueryResult, KQLExplainPlan } from "../../services/kql/parser";
 import { activeToolAdapters, ToolAdapter, AdapterState } from "../../services/adapters/externalToolAdapters";
+import { adapterRegistry } from "../../services/adapters/adapterRegistry";
 
 interface ControlCenterProps {
   onClose: () => void;
@@ -50,6 +51,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [kqlQuery, setKqlQuery] = useState("MATCH Package WHERE certification = Gold RETURN id, version");
   const [kqlResult, setKqlResult] = useState<KQLQueryResult | null>(null);
   const [kqlExplain, setKqlExplain] = useState<KQLExplainPlan[] | null>(null);
+  const [executionResult, setExecutionResult] = useState<any | null>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -155,6 +157,20 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     activeToolAdapters.updateAdapterState(name, nextState);
     setAdapters(activeToolAdapters.getAdaptersList());
     setMockLogs(prev => [...prev, `[Adapter Manager] Transitioned "${name}": ${state} -> ${nextState}.`]);
+  };
+
+  const handleExecuteAdapter = async (name: string) => {
+    const key = name.toLowerCase().split(" ")[0];
+    const adapter = adapterRegistry.getAdapter(key);
+    if (adapter) {
+      const res = await adapter.execute("simulation.run");
+      setExecutionResult(res);
+      setMockLogs(prev => [
+        ...prev,
+        `[Adapter Exec] ${name} run successful. Run ID: ${res.runId}, Duration: ${res.duration}ms.`,
+        ...res.logs.map(log => `  -> ${log}`)
+      ]);
+    }
   };
 
   return (
@@ -688,7 +704,15 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <td className="py-2.5 text-slate-500 font-mono text-[10px]">
                         {a.capabilities.join(", ")}
                       </td>
-                      <td className="py-2.5 text-right">
+                      <td className="py-2.5 text-right flex gap-1.5 justify-end">
+                        {a.state === "Connected" && (
+                          <button
+                            onClick={() => handleExecuteAdapter(a.name)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
+                          >
+                            Execute
+                          </button>
+                        )}
                         <button
                           onClick={() => handleToggleAdapter(a.name, a.state)}
                           className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
@@ -700,6 +724,29 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ))}
                 </tbody>
               </table>
+
+              {executionResult && (
+                <div className="p-3 bg-slate-900 border border-emerald-500/30 rounded mt-3 text-[10px]">
+                  <span className="font-bold text-emerald-300 block mb-1">Execution Result: {executionResult.provider}</span>
+                  <div className="flex gap-4 text-slate-400 font-mono mb-2">
+                    <span>Run ID: <strong>{executionResult.runId}</strong></span>
+                    <span>Duration: <strong>{executionResult.duration}ms</strong></span>
+                    <span>Trace ID: <strong>{executionResult.traceId}</strong></span>
+                  </div>
+                  <div className="border-t border-slate-800/60 pt-2 text-[9px] text-slate-400 font-mono">
+                    <span className="text-slate-350 block mb-1">Execution Logs:</span>
+                    {executionResult.logs.map((log: string, idx: number) => <div key={idx}>&rarr; {log}</div>)}
+                  </div>
+                  {executionResult.artifacts.length > 0 && (
+                    <div className="mt-2 text-slate-500">
+                      <span>Artifacts: </span>
+                      {executionResult.artifacts.map((art: string, idx: number) => (
+                        <span key={idx} className="bg-slate-800 text-cyan-300 px-1 rounded mr-1.5">{art}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
