@@ -76,14 +76,14 @@ import { activeTwinNetwork } from "../../services/twin/distributed/federation/Tw
 import { activeTwinCommunicationBus } from "../../services/twin/distributed/communication/TwinCommunicationBus";
 import type { TwinMessageEnvelope } from "../../services/twin/distributed/communication/MessageContracts";
 import { activeTwinSynchronizationCoordinator } from "../../services/twin/distributed/sync/TwinSynchronizationCoordinator";
-import { activeWorkflowRepository } from "../../services/workflow/repository/WorkflowRepository";
+import { activeWorkflowRepository as activeVisualWorkflowRepository } from "../../services/workflow/repository/WorkflowRepository";
 import { activeWorkflowExecutionBridge } from "../../services/workflow/execution/WorkflowExecutionBridge";
 import { activeGoalPlanner } from "../../services/workflow/orchestration/GoalPlanner";
 import { activeWorkflowGenerator } from "../../services/workflow/orchestration/WorkflowGenerator";
 import { activeExplainabilityEngine } from "../../services/workflow/orchestration/ExplainabilityEngine";
 import { activeScenarioRepository } from "../../services/workflow/scenarios/ScenarioRepository";
 import { activeScenarioComparator } from "../../services/workflow/scenarios/ScenarioComparator";
-import type { WorkflowDefinition } from "../../services/workflow/model/WorkflowDefinition";
+import type { WorkflowDefinition as VisualWorkflowDefinition } from "../../services/workflow/model/WorkflowDefinition";
 import type { Scenario } from "../../services/workflow/scenarios/Scenario";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
@@ -210,8 +210,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [distTwinDescriptors, setDistTwinDescriptors] = useState<any[]>([]);
   const [distTwinMessages, setDistTwinMessages] = useState<TwinMessageEnvelope[]>([]);
   const [distTwinLinks, setDistTwinLinks] = useState<any[]>([]);
-  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowDefinition[]>([]);
-  const [selectedWorkflowDef, setSelectedWorkflowDef] = useState<WorkflowDefinition | null>(null);
+  const [workflowTemplates, setWorkflowTemplates] = useState<VisualWorkflowDefinition[]>([]);
+  const [selectedWorkflowDef, setSelectedWorkflowDef] = useState<VisualWorkflowDefinition | null>(null);
   const [explainabilityEvidence, setExplainabilityEvidence] = useState<any[]>([]);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
   const [comparedMetrics, setComparedMetrics] = useState<any[]>([]);
@@ -371,7 +371,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     }
 
     // Initialize Visual Workflow Presets
-    if (activeWorkflowRepository.getTemplatesList().length === 0) {
+    if (activeVisualWorkflowRepository.getTemplatesList().length === 0) {
       const graph = new WorkflowGraph();
       graph.addNode({
         id: "w-node-1",
@@ -416,7 +416,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
         targetPortName: "SimulationResult"
       });
 
-      const templateDef: WorkflowDefinition = {
+      const templateDef: VisualWorkflowDefinition = {
         id: "wf-microgrid-opt",
         name: "Microgrid Aerodynamics & Solar Yield Optimization",
         version: "v1.2.0",
@@ -425,7 +425,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
         updatedAt: new Date().toISOString()
       };
 
-      activeWorkflowRepository.registerTemplate(templateDef);
+      activeVisualWorkflowRepository.registerTemplate(templateDef);
 
       // Create Scenarios
       const scenA: Scenario = {
@@ -451,7 +451,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       activeScenarioRepository.saveScenario(scenB);
     }
 
-    const templates = activeWorkflowRepository.getTemplatesList();
+    const templates = activeVisualWorkflowRepository.getTemplatesList();
     setWorkflowTemplates(templates);
     if (templates.length > 0) {
       setSelectedWorkflowDef(templates[0]);
@@ -893,7 +893,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     const goals = activeGoalPlanner.parseGoal(collabGoalPrompt);
     const graph = activeWorkflowGenerator.generateWorkflowFromGoals(goals);
     
-    const newDef: WorkflowDefinition = {
+    const newDef: VisualWorkflowDefinition = {
       id: `wf-dyn-${Date.now()}`,
       name: `AI: ${collabGoalPrompt}`,
       version: "v1.0.0",
@@ -902,7 +902,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       updatedAt: new Date().toISOString()
     };
 
-    activeWorkflowRepository.saveDraft(newDef);
+    activeVisualWorkflowRepository.saveDraft(newDef);
     setSelectedWorkflowDef(newDef);
 
     setMockLogs(prev => [
