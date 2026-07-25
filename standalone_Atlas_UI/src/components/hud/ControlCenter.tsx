@@ -111,6 +111,7 @@ type ActiveWorkspace =
   | "replayDebugger"
   | "marketplace"
   | "copilot"
+  | "twinStudio"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
