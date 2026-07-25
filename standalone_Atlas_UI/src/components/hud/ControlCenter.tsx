@@ -37,6 +37,10 @@ import { activeWorkflowRepository } from "../../services/workflow/workflowReposi
 import type { WorkflowPackage, PackageStatus } from "../../services/workflow/workflowRepository";
 import { activeWorkflowValidator } from "../../services/workflow/workflowValidator";
 import type { PackageValidationReport, ValidationStageResult } from "../../services/workflow/workflowValidator";
+import { activeWorkflowMarketplace } from "../../services/workflow/workflowMarketplace";
+import type { RemoteMarketplacePackage } from "../../services/workflow/workflowMarketplace";
+import { activeTrustManager } from "../../services/workflow/trustManager";
+import { activePackageInstaller } from "../../services/workflow/packageInstaller";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -60,7 +64,8 @@ type ActiveWorkspace =
   | "nodes"
   | "federation"
   | "workflows"
-  | "replayDebugger";
+  | "replayDebugger"
+  | "marketplace";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("health");
@@ -109,6 +114,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [selectedPackage, setSelectedPackage] = useState<WorkflowPackage | null>(null);
   const [importJson, setImportJson] = useState("");
 
+  // III.4 States
+  const [marketplaceCatalog, setMarketplaceCatalog] = useState<RemoteMarketplacePackage[]>([]);
+  const [selectedMarketplacePackage, setSelectedMarketplacePackage] = useState<RemoteMarketplacePackage | null>(null);
+  const [trustBadges, setTrustBadges] = useState<string | null>(null);
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
@@ -121,6 +131,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setWorkflowInstances(activeWorkflowEngine.getInstancesList());
     setWorkflowEvents(activeWorkflowEventStore.getEventsList());
     setWorkflowPackages(activeWorkflowRepository.getPackagesList());
+    setMarketplaceCatalog(activeWorkflowMarketplace.getRemoteCatalog());
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
@@ -348,6 +359,18 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setValidationReport(report);
   };
 
+  // III.4 Handlers
+  const handleInstallMarketplacePackage = (item: RemoteMarketplacePackage) => {
+    const res = activePackageInstaller.installPackage(item.package, item.signature, item.publisherKey);
+    setMockLogs(prev => [...prev, `[Installer] ${res.message}`]);
+    setWorkflowPackages(activeWorkflowRepository.getPackagesList());
+  };
+
+  const handleEvaluateMarketplaceTrust = (item: RemoteMarketplacePackage) => {
+    const report = activeTrustManager.evaluateTrust(item.package, item.signature, item.publisherKey);
+    setTrustBadges(`Publisher: ${report.publisher} | Certification: ${report.level} | Details: ${report.details}`);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -482,6 +505,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
           >
             ⏳ Replay Debugger
           </button>
+          <button
+            onClick={() => setActiveTab("marketplace")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "marketplace"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🛒 Marketplace
+          </button>
 
           {/* Group 4: Diagnostics */}
           <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider mt-2">Diagnostics</span>
@@ -589,7 +622,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 </div>
                 <button
                   onClick={() => handleAction("astronomy", "Available")}
-                  className="bg-cyan-500 text-slate-950 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
+                  className="bg-cyan-500 text-slate-955 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
                 >
                   Scaffold Astronomy
                 </button>
@@ -611,7 +644,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           pkg.qualityLevel === "Platinum"
                             ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                            : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                            : "bg-cyan-505/20 text-cyan-300 border border-cyan-500/30"
                         }`}>
                           {pkg.qualityLevel}
                         </span>
@@ -873,7 +906,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </span>
                       </td>
                       <td className="py-2.5 text-slate-400">{a.lastSync}</td>
-                      <td className="py-2.5 text-slate-500 font-mono text-[10px]">
+                      <td className="py-2.5 text-slate-505 font-mono text-[10px]">
                         {a.capabilities.join(", ")}
                       </td>
                       <td className="py-2.5 text-right flex gap-1.5 justify-end">
@@ -922,12 +955,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
               {jobsQueue.length > 0 && (
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded mt-3 text-[10px] flex flex-col gap-1.5">
-                  <span className="font-bold text-slate-400 block border-b border-slate-850 pb-1">Orchestrated Execution Jobs Queue</span>
+                  <span className="font-bold text-slate-400 block border-b border-slate-855 pb-1">Orchestrated Execution Jobs Queue</span>
                   {jobsQueue.map(job => (
                     <div key={job.jobId} className="flex justify-between items-center py-1 border-b border-slate-900/60 last:border-0">
                       <div>
                         <span className="font-mono font-bold text-slate-300">{job.jobId}</span>
-                        <span className="text-slate-500 font-mono ml-2">[{job.providerKey}] command: "{job.command}" (Retries: {job.retries})</span>
+                        <span className="text-slate-505 font-mono ml-2">[{job.providerKey}] command: "{job.command}" (Retries: {job.retries})</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold ${
@@ -962,7 +995,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">🕸️ KNOWLEDGE QUERY LANGUAGE (KQL) CONSOLE</h3>
-                <p className="text-[10px] text-slate-500">Run graph query matches and inspect tokenization pipeline compilation plans</p>
+                <p className="text-[10px] text-slate-505">Run graph query matches and inspect tokenization pipeline compilation plans</p>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -1010,7 +1043,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ) : (
                     <table className="w-full text-left border-collapse text-[10px] font-mono">
                       <thead>
-                        <tr className="border-b border-slate-800 text-slate-500">
+                        <tr className="border-b border-slate-805 text-slate-500">
                           {kqlResult.headers.map(h => <th key={h} className="pb-1">{h}</th>)}
                         </tr>
                       </thead>
@@ -1050,7 +1083,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               </div>
               <table className="w-full text-left border-collapse text-[10px]">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-500 font-bold">
+                  <tr className="border-b border-slate-800 text-slate-505 font-bold">
                     <th className="py-1">Node ID</th>
                     <th className="py-1">Endpoint</th>
                     <th className="py-1">Latency</th>
@@ -1075,7 +1108,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       </td>
                       <td className="py-2.5 font-mono text-slate-350">{n.currentLoad}/{n.maxCapacity} MB</td>
                       <td className="py-2.5 font-bold text-cyan-300">{n.healthScore}%</td>
-                      <td className="py-2.5 text-right text-slate-500 font-mono">{n.lastHeartbeat}</td>
+                      <td className="py-2.5 text-right text-slate-505 font-mono">{n.lastHeartbeat}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1087,17 +1120,17 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">📡 FEDERATION COORDINATOR STATUS</h3>
-                <p className="text-[10px] text-slate-500">Multi-node fan-out execution logs and merge steps</p>
+                <p className="text-[10px] text-slate-505">Multi-node fan-out execution logs and merge steps</p>
               </div>
               <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto">
                 {federationLogs.length === 0 ? (
-                  <span className="text-slate-500 font-mono italic">No active federated queries. Run "MATCH FederatedNode" to test.</span>
+                  <span className="text-slate-505 font-mono italic">No active federated queries. Run "MATCH FederatedNode" to test.</span>
                 ) : (
                   federationLogs.map((log, index) => (
                     <div key={index} className="p-2.5 bg-slate-900 border border-slate-850 rounded flex flex-col gap-1 text-[10px] font-mono">
                       <div className="flex justify-between border-b border-slate-850/60 pb-1">
                         <span className="text-purple-300 font-bold">Stage: {log.stage} (Query ID: {log.queryId})</span>
-                        <span className="text-slate-500">{log.timestamp}</span>
+                        <span className="text-slate-505">{log.timestamp}</span>
                       </div>
                       <p className="text-slate-400 mt-1">{log.details}</p>
                     </div>
@@ -1113,7 +1146,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-cyan-300">⚙️ WORKFLOW ORCHESTRATION CONSOLE</h3>
-                  <p className="text-[10px] text-slate-500">Search packages, track DAG schedules, and monitor event stream timelines</p>
+                  <p className="text-[10px] text-slate-505">Search packages, track DAG schedules, and monitor event stream timelines</p>
                 </div>
                 <div className="flex gap-2 items-center">
                   <span className="text-[10px] text-slate-400 font-mono">Policy: <strong>{schedulerPolicy}</strong></span>
@@ -1164,9 +1197,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     >
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-slate-200">{pkg.metadata.packageName}</span>
-                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-500">v{pkg.metadata.version}</span>
+                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-505">v{pkg.metadata.version}</span>
                       </div>
-                      <span className="text-[8.5px] text-slate-500 font-mono">Domain: {pkg.metadata.domain} | Author: {pkg.metadata.author}</span>
+                      <span className="text-[8.5px] text-slate-505 font-mono">Domain: {pkg.metadata.domain} | Author: {pkg.metadata.author}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1201,17 +1234,17 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="flex flex-col gap-2.5 border-r border-slate-800/60 pr-4">
                   <span className="font-bold text-slate-400 text-[10.5px]">B. Execution View (DAG Graph)</span>
                   {workflowInstances.length === 0 ? (
-                    <span className="text-slate-600 font-mono italic">No active workflow executions.</span>
+                    <span className="text-slate-605 font-mono italic">No active workflow executions.</span>
                   ) : (
                     workflowInstances.map(inst => (
                       <div key={inst.instanceId} className="p-2 bg-slate-900/60 border border-slate-850 rounded flex flex-col gap-1.5">
                         <span className="font-mono text-[9px] text-cyan-300 block">{inst.instanceId} ({inst.state})</span>
                         <div className="flex flex-col gap-1.5 mt-1">
                           {inst.steps.map((step) => (
-                            <div key={step.stepId} className="flex justify-between items-center p-1.5 bg-slate-950/40 border border-slate-900 rounded text-[9.5px]">
+                            <div key={step.stepId} className="flex justify-between items-center p-1.5 bg-slate-955/40 border border-slate-900 rounded text-[9.5px]">
                               <div>
                                 <span className="font-bold text-slate-300">{step.name}</span>
-                                {step.assignedNode && <div className="text-[8px] text-slate-500 font-mono">Node: {step.assignedNode}</div>}
+                                {step.assignedNode && <div className="text-[8px] text-slate-505 font-mono">Node: {step.assignedNode}</div>}
                               </div>
                               {step.state === "Ready" ? (
                                 <button
@@ -1222,7 +1255,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                                 </button>
                               ) : (
                                 <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                                  step.state === "Completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                                  step.state === "Completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-505"
                                 }`}>{step.state}</span>
                               )}
                             </div>
@@ -1256,7 +1289,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </div>
                       </div>
                     ) : (
-                      <span className="text-slate-650 font-mono italic">Select package to audit compliance validations.</span>
+                      <span className="text-slate-655 font-mono italic">Select package to audit compliance validations.</span>
                     )}
                   </div>
 
@@ -1270,15 +1303,15 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                           <span>Target: {latestDecision.selectedNode.name}</span>
                           <span className="text-cyan-400">Score: {latestDecision.score}%</span>
                         </div>
-                        <p className="text-slate-500 mt-1 leading-snug">{latestDecision.reasoning}</p>
+                        <p className="text-slate-505 mt-1 leading-snug">{latestDecision.reasoning}</p>
                         {latestDecision.alternatives.length > 0 && (
-                          <div className="mt-1 border-t border-slate-850/60 pt-1 text-[8px] text-slate-500">
+                          <div className="mt-1 border-t border-slate-850/60 pt-1 text-[8px] text-slate-505">
                             <span>Alternatives: {latestDecision.alternatives.join(", ")}</span>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <span className="text-slate-600 font-mono italic text-[9px]">No scheduling decisions made yet.</span>
+                      <span className="text-slate-605 font-mono italic text-[9px]">No scheduling decisions made yet.</span>
                     )}
                   </div>
                 </div>
@@ -1292,7 +1325,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-cyan-300">⏳ REPLAY DEBUGGER CONSOLE</h3>
-                  <p className="text-[10px] text-slate-500">Durable Event Sourcing: Reconstruct history state reducers from append-only Store logs</p>
+                  <p className="text-[10px] text-slate-550">Durable Event Sourcing: Reconstruct history state reducers from append-only Store logs</p>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -1311,7 +1344,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto border-r border-slate-800/60 pr-4">
                   <span className="font-bold text-slate-400 text-[10.5px]">1. Durable Events Timeline</span>
                   {filteredEvents.length === 0 ? (
-                    <span className="text-slate-600 font-mono italic">No events found.</span>
+                    <span className="text-slate-605 font-mono italic">No events found.</span>
                   ) : (
                     filteredEvents.map(evt => (
                       <div
@@ -1326,7 +1359,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       >
                         <div className="flex justify-between text-[9px]">
                           <span className="font-bold">Seq {evt.sequenceNumber} | {evt.eventType}</span>
-                          <span className="text-slate-500">{evt.timestamp}</span>
+                          <span className="text-slate-505">{evt.timestamp}</span>
                         </div>
                       </div>
                     ))
@@ -1345,7 +1378,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <pre className="text-[8.5px] leading-snug">{JSON.stringify(selectedEvent.payload, null, 2)}</pre>
                     </div>
                   ) : (
-                    <span className="text-slate-650 font-mono italic">Select an event from the timeline to inspect payloads.</span>
+                    <span className="text-slate-655 font-mono italic">Select an event from the timeline to inspect payloads.</span>
                   )}
                 </div>
 
@@ -1369,7 +1402,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </button>
                         <button
                           onClick={handlePlayAllReplay}
-                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] cursor-pointer"
+                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-2 py-0.5 rounded text-[9px] cursor-pointer"
                         >
                           ▶ Play All
                         </button>
@@ -1387,7 +1420,82 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       </div>
                     </div>
                   ) : (
-                    <span className="text-slate-650 font-mono italic">Click any event to initiate replay state reduction cycles.</span>
+                    <span className="text-slate-655 font-mono italic">Click any event to initiate replay state reduction cycles.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🛒 Marketplace Workspace */}
+          {activeTab === "marketplace" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">🛒 DISTRIBUTED WORKFLOW MARKETPLACE</h3>
+                <p className="text-[10px] text-slate-500">Discover, trust-verify, and install certified engineering workflow packages</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                {/* Panel 1: Available Packages */}
+                <div className="flex flex-col gap-2 border-r border-slate-800/60 pr-4">
+                  <span className="font-bold text-slate-400 text-[10.5px]">1. Available Marketplace Packages</span>
+                  {marketplaceCatalog.map(item => (
+                    <div
+                      key={item.package.packageId}
+                      onClick={() => {
+                        setSelectedMarketplacePackage(item);
+                        handleEvaluateMarketplaceTrust(item);
+                      }}
+                      className={`p-2.5 border rounded flex flex-col gap-1 cursor-pointer hover:border-cyan-500/50 ${
+                        selectedMarketplacePackage?.package.packageId === item.package.packageId ? "bg-slate-900 border-cyan-500" : "bg-slate-900/60 border-slate-850"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-slate-200">{item.package.metadata.packageName}</span>
+                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 text-slate-500 rounded font-mono">v{item.package.metadata.version}</span>
+                      </div>
+                      <span className="text-[8.5px] text-slate-500">Downloads: {item.downloadsCount}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Panel 2: Details & Trust report */}
+                <div className="flex flex-col gap-2 border-r border-slate-800/60 pr-4">
+                  <span className="font-bold text-slate-400 text-[10.5px]">2. Package Details & Trust Report</span>
+                  {selectedMarketplacePackage ? (
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2 text-[9.5px]">
+                      <div>Publisher Key: <span className="font-mono text-cyan-400">{selectedMarketplacePackage.publisherKey}</span></div>
+                      <div>Signature Checksum: <span className="font-mono text-slate-500 text-[8.5px] break-all">{selectedMarketplacePackage.signature}</span></div>
+                      
+                      {trustBadges && (
+                        <div className="mt-2 p-2 bg-slate-950 border border-purple-500/30 rounded text-[8.5px] font-mono leading-relaxed">
+                          <span className="font-bold text-purple-300 block mb-1">Trust Verification Analysis:</span>
+                          {trustBadges}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-655 font-mono italic">Select package to load metadata validation summaries.</span>
+                  )}
+                </div>
+
+                {/* Panel 3: Installation Queue */}
+                <div className="flex flex-col gap-3">
+                  <span className="font-bold text-slate-400 text-[10.5px]">3. Installer Pipeline Actions</span>
+                  {selectedMarketplacePackage ? (
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2">
+                      <p className="text-[9px] text-slate-400 leading-snug">
+                        The package installer runs signature checksum matches and capability validations before publishing to your local repository.
+                      </p>
+                      <button
+                        onClick={() => handleInstallMarketplacePackage(selectedMarketplacePackage)}
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-1.5 rounded text-[10px] cursor-pointer"
+                      >
+                        Run Package Installation
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-slate-655 font-mono italic">Select package to trigger installation.</span>
                   )}
                 </div>
               </div>
@@ -1398,23 +1506,23 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">PLATFORM QUALITY TELEMETRY MONITOR</h3>
-                <p className="text-[10px] text-slate-500">Live operational benchmarks and latency stats</p>
+                <p className="text-[10px] text-slate-550">Live operational benchmarks and latency stats</p>
               </div>
               <div className="grid grid-cols-4 gap-4 text-center font-mono">
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Event Depth</span>
+                  <span className="text-[9px] text-slate-505 uppercase block font-bold">Event Depth</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.eventBusQueueDepth} items</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">AKG Query Latency</span>
+                  <span className="text-[9px] text-slate-505 uppercase block font-bold">AKG Query Latency</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.akgQueryLatencyMs} ms</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Core Memory Space</span>
+                  <span className="text-[9px] text-slate-505 uppercase block font-bold">Core Memory Space</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.memoryUsageMb} MB</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Render Latency</span>
+                  <span className="text-[9px] text-slate-505 uppercase block font-bold">Render Latency</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{Math.floor(1000 / metrics.renderFps)} ms</span>
                 </div>
               </div>
