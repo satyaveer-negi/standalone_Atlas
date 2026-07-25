@@ -76,6 +76,15 @@ import { activeTwinNetwork } from "../../services/twin/distributed/federation/Tw
 import { activeTwinCommunicationBus } from "../../services/twin/distributed/communication/TwinCommunicationBus";
 import type { TwinMessageEnvelope } from "../../services/twin/distributed/communication/MessageContracts";
 import { activeTwinSynchronizationCoordinator } from "../../services/twin/distributed/sync/TwinSynchronizationCoordinator";
+import { activeWorkflowRepository } from "../../services/workflow/repository/WorkflowRepository";
+import { activeWorkflowExecutionBridge } from "../../services/workflow/execution/WorkflowExecutionBridge";
+import { activeGoalPlanner } from "../../services/workflow/orchestration/GoalPlanner";
+import { activeWorkflowGenerator } from "../../services/workflow/orchestration/WorkflowGenerator";
+import { activeExplainabilityEngine } from "../../services/workflow/orchestration/ExplainabilityEngine";
+import { activeScenarioRepository } from "../../services/workflow/scenarios/ScenarioRepository";
+import { activeScenarioComparator } from "../../services/workflow/scenarios/ScenarioComparator";
+import type { WorkflowDefinition } from "../../services/workflow/model/WorkflowDefinition";
+import type { Scenario } from "../../services/workflow/scenarios/Scenario";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -201,6 +210,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [distTwinDescriptors, setDistTwinDescriptors] = useState<any[]>([]);
   const [distTwinMessages, setDistTwinMessages] = useState<TwinMessageEnvelope[]>([]);
   const [distTwinLinks, setDistTwinLinks] = useState<any[]>([]);
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowDefinition[]>([]);
+  const [selectedWorkflowDef, setSelectedWorkflowDef] = useState<WorkflowDefinition | null>(null);
+  const [explainabilityEvidence, setExplainabilityEvidence] = useState<any[]>([]);
+  const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
+  const [comparedMetrics, setComparedMetrics] = useState<any[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -354,6 +368,99 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
       const gridT = activeTwinRepository.createTwin("grid-twin-01", "Distribution Substation #4", "Energy");
       gridT.addEntity({ id: "utility-breaker", name: "Main Feeder Breaker", type: "PowerSwitch", properties: { gridVoltage: 120 } });
+    }
+
+    // Initialize Visual Workflow Presets
+    if (activeWorkflowRepository.getTemplatesList().length === 0) {
+      const graph = new WorkflowGraph();
+      graph.addNode({
+        id: "w-node-1",
+        name: "Solar Irradiance Feed",
+        category: "Twin",
+        type: "TwinNode",
+        inputs: [],
+        outputs: [{ name: "Irradiance", type: "PowerModel" }],
+        properties: { twinId: "pv-twin-01" }
+      });
+      graph.addNode({
+        id: "w-node-2",
+        name: "Battery SoC Simulation",
+        category: "Simulation",
+        type: "SimulationNode",
+        inputs: [{ name: "Irradiance", type: "PowerModel" }],
+        outputs: [{ name: "SimulationResult", type: "SimulationResult" }],
+        properties: { solverName: "MatlabESS" }
+      });
+      graph.addNode({
+        id: "w-node-3",
+        name: "Safety Audit Gate",
+        category: "Verification",
+        type: "VerificationNode",
+        inputs: [{ name: "SimulationResult", type: "SimulationResult" }],
+        outputs: [{ name: "PassedReport", type: "Report" }],
+        properties: { safetyLimitPercent: 20 }
+      });
+
+      graph.addConnection({
+        id: "w-conn-1",
+        sourceNodeId: "w-node-1",
+        sourcePortName: "Irradiance",
+        targetNodeId: "w-node-2",
+        targetPortName: "Irradiance"
+      });
+      graph.addConnection({
+        id: "w-conn-2",
+        sourceNodeId: "w-node-2",
+        sourcePortName: "SimulationResult",
+        targetNodeId: "w-node-3",
+        targetPortName: "SimulationResult"
+      });
+
+      const templateDef: WorkflowDefinition = {
+        id: "wf-microgrid-opt",
+        name: "Microgrid Aerodynamics & Solar Yield Optimization",
+        version: "v1.2.0",
+        graph,
+        author: "HP (Chief Architect)",
+        updatedAt: new Date().toISOString()
+      };
+
+      activeWorkflowRepository.registerTemplate(templateDef);
+
+      // Create Scenarios
+      const scenA: Scenario = {
+        id: "scen-a",
+        name: "Scenario A: Optimal Solar Yield",
+        workflowDef: templateDef,
+        parameters: { irradianceVal: 85 },
+        variables: { batteryStateOfCharge: 88, gridVoltageStability: 120 },
+        executionTimeMs: 120,
+        verificationReportStatus: "Passed"
+      };
+      const scenB: Scenario = {
+        id: "scen-b",
+        name: "Scenario B: Heavy Cloud Transient",
+        workflowDef: templateDef,
+        parameters: { irradianceVal: 35 },
+        variables: { batteryStateOfCharge: 52, gridVoltageStability: 114 },
+        executionTimeMs: 145,
+        verificationReportStatus: "Failed"
+      };
+
+      activeScenarioRepository.saveScenario(scenA);
+      activeScenarioRepository.saveScenario(scenB);
+    }
+
+    const templates = activeWorkflowRepository.getTemplatesList();
+    setWorkflowTemplates(templates);
+    if (templates.length > 0) {
+      setSelectedWorkflowDef(templates[0]);
+    }
+    setActiveScenarios(activeScenarioRepository.getScenariosList());
+
+    const scenList = activeScenarioRepository.getScenariosList();
+    if (scenList.length >= 2) {
+      setComparedMetrics(activeScenarioComparator.compareScenarios(scenList[0], scenList[1]));
     }
 
     setTwinList(activeTwinRepository.getTwinsList());
@@ -759,6 +866,49 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setTwinList(activeTwinRepository.getTwinsList());
     setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(selectedTwinId));
     setDistTwinMessages(activeTwinCommunicationBus.getHistoryLogs());
+  };
+
+  const handleTriggerVisualWorkflowExecution = () => {
+    if (!selectedWorkflowDef) return;
+    
+    const session = activeWorkflowExecutionBridge.executeGraph(
+      selectedWorkflowDef.graph,
+      selectedWorkflowDef.id
+    );
+
+    const evidence = activeExplainabilityEngine.traceRecommendation(
+      "Microgrid Yield Optimal: Increase battery charge to 95%"
+    );
+    setExplainabilityEvidence(evidence);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Workflow Execution] Visual Graph "${selectedWorkflowDef.name}" execution session ${session.id} transitions: Created -> Running -> Completed.`
+    ]);
+
+    setCollabNodes(activeSharedTaskGraph.getNodes());
+  };
+
+  const handleGenerateWorkflowFromGoal = () => {
+    const goals = activeGoalPlanner.parseGoal(collabGoalPrompt);
+    const graph = activeWorkflowGenerator.generateWorkflowFromGoals(goals);
+    
+    const newDef: WorkflowDefinition = {
+      id: `wf-dyn-${Date.now()}`,
+      name: `AI: ${collabGoalPrompt}`,
+      version: "v1.0.0",
+      graph,
+      author: "EIOS Planner",
+      updatedAt: new Date().toISOString()
+    };
+
+    activeWorkflowRepository.saveDraft(newDef);
+    setSelectedWorkflowDef(newDef);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Goal Planner] Parsed ${goals.length} subgoals from prompt. Assembled visual flow graph.`
+    ]);
   };
 
   const filteredEvents = filterCorrelationId
@@ -1799,6 +1949,118 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                               <span className="text-slate-505">{log.timestamp}</span>
                             </div>
                             <p className="text-slate-405 leading-snug mt-0.5">{log.details}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🎨 VISUAL WORKFLOW BLUEPRINT CANVAS (STUDIO) */}
+              <div className="border-t border-slate-800 pt-4 mt-2 flex flex-col gap-4">
+                <div className="flex justify-between items-center bg-slate-900/50 p-2.5 rounded border border-slate-850">
+                  <div className="flex items-center gap-2 w-2/3">
+                    <span className="text-[10px] text-cyan-400 font-bold font-mono">Cognitive Goal:</span>
+                    <input
+                      type="text"
+                      value={collabGoalPrompt}
+                      onChange={(e) => setCollabGoalPrompt(e.target.value)}
+                      className="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[9.5px] font-mono text-cyan-300 focus:outline-none w-full"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleGenerateWorkflowFromGoal}
+                      className="bg-purple-650 hover:bg-purple-550 text-white font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                    >
+                      AI Compose Graph
+                    </button>
+                    <button
+                      onClick={handleTriggerVisualWorkflowExecution}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                    >
+                      Execute Scheduler Bridge
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Canvas Nodes Graph */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 col-span-1">
+                    <div className="flex justify-between items-center border-b border-slate-850 pb-1">
+                      <span className="font-bold text-slate-350 text-[10px]">Visual Graph: {selectedWorkflowDef?.name}</span>
+                      <span className="text-[7.5px] text-slate-500 font-bold">{selectedWorkflowDef?.version}</span>
+                    </div>
+                    <div className="max-h-[150px] overflow-y-auto flex flex-col gap-2 mt-1">
+                      {selectedWorkflowDef?.graph.nodes.map(node => (
+                        <div key={node.id} className="p-2 bg-slate-950/60 border border-slate-850 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-cyan-350 text-[9.5px]">
+                            <span>{node.name}</span>
+                            <span className="text-slate-550 text-[8px]">({node.category})</span>
+                          </div>
+                          {node.inputs.length > 0 && (
+                            <div className="text-[7.5px] text-slate-450 leading-tight">
+                              Inputs: {node.inputs.map(p => `${p.name} (${p.type})`).join(", ")}
+                            </div>
+                          )}
+                          {node.outputs.length > 0 && (
+                            <div className="text-[7.5px] text-emerald-450 leading-tight">
+                              Outputs: {node.outputs.map(p => `${p.name} (${p.type})`).join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Scenario Comparator */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Scenario Experiment Comparator</span>
+                    <div className="max-h-[150px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                      <table className="w-full text-[8.5px] text-left">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-slate-900">
+                            <th className="pb-1">Variable</th>
+                            <th className="pb-1 text-center">Scenario A</th>
+                            <th className="pb-1 text-center">Scenario B</th>
+                            <th className="pb-1 text-right">Dev</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparedMetrics.map((row, idx) => (
+                            <tr key={idx} className="border-b border-slate-900/60 last:border-0">
+                              <td className="py-1 text-slate-300 font-bold">{row.parameterName}</td>
+                              <td className="py-1 text-center text-slate-400">{row.scenario1Value}</td>
+                              <td className="py-1 text-center text-slate-400">{row.scenario2Value}</td>
+                              <td className={`py-1 text-right font-bold ${
+                                row.deviation.startsWith("-") ? "text-red-400" : "text-emerald-400"
+                              }`}>{row.deviation}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Explainability Engine evidence logs */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">AI Explainability Evidence Traces</span>
+                    <div className="max-h-[150px] overflow-y-auto flex flex-col gap-2 mt-1">
+                      {explainabilityEvidence.length === 0 ? (
+                        <span className="text-slate-655 font-mono italic text-[8.5px]">Run scheduler execution to query explainability evidence traces.</span>
+                      ) : (
+                        explainabilityEvidence.map((ev, idx) => (
+                          <div key={idx} className="border-b border-slate-900 pb-1.5 last:border-0">
+                            <div className="flex justify-between font-bold text-slate-200">
+                              <span className="text-purple-300">{ev.propertyName}</span>
+                              <span className="text-slate-500">Conf: {(ev.sourceConfidence * 100).toFixed(0)}%</span>
+                            </div>
+                            <p className="text-[8px] text-slate-400 leading-tight mt-0.5">{ev.ruleExplanation}</p>
+                            <div className="text-[7.5px] text-slate-500 flex justify-between mt-1">
+                              <span>Val: {ev.currentValue}</span>
+                              <span>Limit: {ev.thresholdLimit}</span>
+                            </div>
                           </div>
                         ))
                       )}
