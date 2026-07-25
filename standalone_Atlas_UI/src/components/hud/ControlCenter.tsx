@@ -55,6 +55,15 @@ import { activeAutonomousAgentEngine } from "../../services/workflow/workflowAut
 import type { AgentState, AgentLog, LearningRecord } from "../../services/workflow/workflowAutonomousAgent";
 import { activeDomainAgentRegistry } from "../../services/agents/registry/domainAgentRegistry";
 import type { DomainAgentDescriptor } from "../../services/agents/registry/domainAgentRegistry";
+import { activeCoordinatorAgent } from "../../services/agents/collaboration/coordinator/CoordinatorAgent";
+import { activeSharedTaskGraph } from "../../services/agents/collaboration/graph/SharedTaskGraph";
+import { activeVariableStore } from "../../services/agents/collaboration/graph/VariableStore";
+import { activeCollabEventBus } from "../../services/agents/collaboration/events/EventBus";
+import type { CollaborativeEvent } from "../../services/agents/collaboration/events/EventTypes";
+import type { TaskNode } from "../../services/agents/collaboration/graph/TaskNode";
+import type { Variable } from "../../services/agents/collaboration/graph/Variable";
+import { activeCapabilityRegistry } from "../../services/agents/collaboration/registry/CapabilityRegistry";
+import type { AgentDescriptor } from "../../services/agents/collaboration/registry/AgentDescriptor";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -164,6 +173,15 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [agentLearnings, setAgentLearnings] = useState<LearningRecord[]>([]);
   const [domainAgents, setDomainAgents] = useState<DomainAgentDescriptor[]>([]);
 
+  // IV-B Collaborative States
+  const [collabGoalPrompt, setCollabGoalPrompt] = useState("Run CFD audit and compute math matrix");
+  const [collabReport, setCollabReport] = useState("");
+  const [collabEvents, setCollabEvents] = useState<CollaborativeEvent[]>([]);
+  const [collabNodes, setCollabNodes] = useState<TaskNode[]>([]);
+  const [collabVariables, setCollabVariables] = useState<Variable[]>([]);
+  const [collabAgents, setCollabAgents] = useState<AgentDescriptor[]>([]);
+  const [collabRunning, setCollabRunning] = useState(false);
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
@@ -184,6 +202,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setAgentLogs(activeAutonomousAgentEngine.getLogs());
     setAgentLearnings(activeAutonomousAgentEngine.getLearningRecords());
     setDomainAgents(activeDomainAgentRegistry.getAgentsList());
+    setCollabAgents(activeCapabilityRegistry.getAgentsList());
+    setCollabNodes(activeSharedTaskGraph.getNodes());
+    setCollabVariables(activeVariableStore.getVariablesList());
+    setCollabEvents(activeCollabEventBus.getEventHistory());
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
@@ -191,6 +213,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       if (event.eventType === "SchedulingDecisionMade" && event.payload?.decision) {
         setLatestDecision(event.payload.decision);
       }
+    });
+
+    const unsubscribeCollab = activeCollabEventBus.subscribe((event) => {
+      setCollabEvents(activeCollabEventBus.getEventHistory());
+      setCollabNodes(activeSharedTaskGraph.getNodes());
+      setCollabVariables(activeVariableStore.getVariablesList());
+      setCollabAgents(activeCapabilityRegistry.getAgentsList());
     });
 
     const interval = setInterval(() => {
@@ -208,6 +237,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
     return () => {
       unsubscribe();
+      unsubscribeCollab();
       clearInterval(interval);
     };
   }, []);
@@ -497,6 +527,22 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       ...prev,
       `[Autonomous Agent] Completed planning and execution loop for prompt: "${agentTaskPrompt}"`
     ]);
+  };
+
+  const handleTriggerCollaborativeAgent = async () => {
+    setCollabRunning(true);
+    setCollabReport("");
+    try {
+      const report = await activeCoordinatorAgent.orchestrate(collabGoalPrompt);
+      setCollabReport(report);
+    } catch (err) {
+      console.error("[Control Center] Collaborative Orchestration Crash:", err);
+    } finally {
+      setCollabRunning(false);
+      setCollabNodes(activeSharedTaskGraph.getNodes());
+      setCollabVariables(activeVariableStore.getVariablesList());
+      setCollabEvents(activeCollabEventBus.getEventHistory());
+    }
   };
 
   const filteredEvents = filterCorrelationId
@@ -1937,6 +1983,128 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 🤖 EIOS COLLABORATIVE MULTI-AGENT WORKSPACE */}
+              <div className="border-t border-slate-800 pt-4 mt-2 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-xs text-purple-300">👥 EIOS COLLABORATIVE WORKSPACE</h4>
+                    <p className="text-[9px] text-slate-500">Decompose goal prompts, route tasks through Event Bus, and synchronize Blackboard variables</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-405">Status:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      collabRunning ? "bg-purple-900/40 text-purple-300 animate-pulse" : "bg-slate-800 text-slate-505"
+                    }`}>
+                      {collabRunning ? "Coordinating" : "Idle"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={collabGoalPrompt}
+                    onChange={(e) => setCollabGoalPrompt(e.target.value)}
+                    placeholder="Enter collaborative multi-agent prompt..."
+                    className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[11px] font-mono text-purple-300 focus:outline-none flex-1"
+                  />
+                  <button
+                    onClick={handleTriggerCollaborativeAgent}
+                    disabled={collabRunning}
+                    className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-slate-100 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  >
+                    Trigger Collab Execution
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-4 gap-4">
+                  {/* Panel 1: DAG Execution Graph */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Task DAG Nodes</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                      {collabNodes.length === 0 ? (
+                        <span className="text-slate-600 italic">No nodes scheduled.</span>
+                      ) : (
+                        collabNodes.map(node => (
+                          <div key={node.id} className="border-b border-slate-900 pb-1 last:border-0">
+                            <div className="flex justify-between font-bold">
+                              <span className="text-purple-300">{node.id}</span>
+                              <span className={`text-[8.5px] ${
+                                node.status === "Completed" ? "text-emerald-400" :
+                                node.status === "Running" ? "text-cyan-400 animate-pulse" : "text-slate-400"
+                              }`}>{node.status}</span>
+                            </div>
+                            <p className="text-slate-300 mt-0.5 text-[8.5px] leading-snug">{node.objective}</p>
+                            {node.assignedAgentId && (
+                              <div className="text-[8px] text-slate-500 mt-0.5">Owner: {node.assignedAgentId}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Panel 2: Blackboard Variables */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono col-span-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Variable Blackboard</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1 mt-1">
+                      {collabVariables.length === 0 ? (
+                        <span className="text-slate-600 italic">No variables published.</span>
+                      ) : (
+                        collabVariables.map(v => (
+                          <div key={v.id} className="border-b border-slate-900 pb-1 last:border-0">
+                            <div className="flex justify-between text-slate-300">
+                              <span className="font-bold text-cyan-400">{v.name}</span>
+                              <span className="text-slate-500">{v.type}</span>
+                            </div>
+                            <div className="text-slate-100 font-bold mt-0.5 text-[9.5px]">
+                              Value: {v.value} <span className="text-slate-400 text-[8.5px]">{v.unit}</span>
+                            </div>
+                            {v.producerAgent && (
+                              <div className="text-[7.5px] text-slate-500">Source: {v.producerAgent}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Panel 3: Event Bus Timeline */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Collab Event Bus</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[8.5px]">
+                      {collabEvents.length === 0 ? (
+                        <span className="text-slate-600 italic">Event Bus log clean.</span>
+                      ) : (
+                        [...collabEvents].reverse().map(evt => (
+                          <div key={evt.eventId} className="border-b border-slate-900 pb-1 last:border-0 leading-tight">
+                            <span className="text-purple-400 font-bold">[{evt.eventType}]</span> <span className="text-slate-550">{evt.timestamp}</span>
+                            {evt.payload?.objective && (
+                              <div className="text-slate-300">{evt.payload.objective}</div>
+                            )}
+                            {evt.payload?.name && (
+                              <div className="text-slate-300">Published: {evt.payload.name} = {evt.payload.value}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Panel 4: Compiled Audit Report */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Consolidated Synthesis Report</span>
+                    <div className="max-h-[140px] overflow-y-auto mt-1">
+                      {collabReport ? (
+                        <pre className="text-[8px] text-slate-300 leading-tight whitespace-pre-wrap">{collabReport}</pre>
+                      ) : (
+                        <span className="text-slate-605 italic">Report compile pending run loop completion.</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

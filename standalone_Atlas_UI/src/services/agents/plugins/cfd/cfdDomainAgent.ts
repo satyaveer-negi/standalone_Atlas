@@ -2,6 +2,7 @@ import { BaseDomainAgent } from "../../core/baseDomainAgent";
 import { DomainValidationReport } from "../../core/engineeringAgent";
 import { CfdRuleEngine } from "./cfdRuleEngine";
 import { activeDomainAgentRegistry } from "../../registry/domainAgentRegistry";
+import { activeCapabilityRegistry } from "../../collaboration/registry/CapabilityRegistry";
 
 export class CfdDomainAgent extends BaseDomainAgent {
   private ruleEngine = new CfdRuleEngine();
@@ -33,3 +34,14 @@ activeDomainAgentRegistry.register({
   activeTasks: 0,
   agentInstance: cfdAgentPlugin
 });
+
+activeCapabilityRegistry.register({
+  id: "agent-cfd-optimizer",
+  name: "CFD Aerodynamics Specialist Agent",
+  version: "v1.0",
+  capabilities: ["cfdAudit", "solveThermal", "mesh"],
+  health: "Available",
+  priority: 10,
+  agentInstance: cfdAgentPlugin
+});
+
