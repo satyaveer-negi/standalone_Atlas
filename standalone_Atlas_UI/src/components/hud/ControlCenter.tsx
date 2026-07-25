@@ -71,6 +71,11 @@ import { activeTwinStateEngine } from "../../services/twin/state/TwinStateEngine
 import { activeSyncManager } from "../../services/twin/sync/SyncManager";
 import { activeSimulationBridge } from "../../services/twin/simulation/SimulationBridge";
 import { activeTwinIntelligence } from "../../services/twin/intelligence/TwinIntelligence";
+import { activeTwinRegistry } from "../../services/twin/distributed/registry/TwinRegistry";
+import { activeTwinNetwork } from "../../services/twin/distributed/federation/TwinNetwork";
+import { activeTwinCommunicationBus } from "../../services/twin/distributed/communication/TwinCommunicationBus";
+import type { TwinMessageEnvelope } from "../../services/twin/distributed/communication/MessageContracts";
+import { activeTwinSynchronizationCoordinator } from "../../services/twin/distributed/sync/TwinSynchronizationCoordinator";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -193,6 +198,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [twinList, setTwinList] = useState<any[]>([]);
   const [selectedTwinId, setSelectedTwinId] = useState<string>("twin-propeller-01");
   const [twinDiagnosis, setTwinDiagnosis] = useState<any>(null);
+  const [distTwinDescriptors, setDistTwinDescriptors] = useState<any[]>([]);
+  const [distTwinMessages, setDistTwinMessages] = useState<TwinMessageEnvelope[]>([]);
+  const [distTwinLinks, setDistTwinLinks] = useState<any[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -281,8 +289,84 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       });
     }
 
+    // Initialize Distributed Twin Network
+    if (activeTwinRegistry.getDescriptorsList().length === 0) {
+      activeTwinRegistry.register({
+        id: "pv-twin-01",
+        name: "PV Array Solar",
+        displayName: "Solar Field PV Array #1",
+        domain: "Energy",
+        version: "1.0",
+        endpoint: { protocol: "http", host: "10.0.0.10", port: 8081, path: "/twin/pv" },
+        capabilities: [{ name: "SolarOutput", type: "Sensor", description: "Solar irradiance output yield" }],
+        status: "Online",
+        owner: "Engineering Operator",
+        organization: "Microgrid-Co",
+        region: "US-West",
+        tags: ["solar", "generation"],
+        supportedProtocols: ["http", "ws"],
+        securityProfile: "StandardTLS"
+      });
+
+      activeTwinRegistry.register({
+        id: "battery-twin-01",
+        name: "Li-Ion ESS Battery",
+        displayName: "Tesla Megapack Storage Array",
+        domain: "Energy",
+        version: "1.0",
+        endpoint: { protocol: "http", host: "10.0.0.11", port: 8082, path: "/twin/battery" },
+        capabilities: [{ name: "BatteryCapacity", type: "Sensor", description: "Capacity and SoC levels" }],
+        status: "Online",
+        owner: "Engineering Operator",
+        organization: "Microgrid-Co",
+        region: "US-West",
+        tags: ["battery", "storage"],
+        supportedProtocols: ["http", "ws"],
+        securityProfile: "StandardTLS"
+      });
+
+      activeTwinRegistry.register({
+        id: "grid-twin-01",
+        name: "Substation Grid Interface",
+        displayName: "Distribution Substation #4",
+        domain: "Energy",
+        version: "1.0",
+        endpoint: { protocol: "http", host: "10.0.0.12", port: 8083, path: "/twin/grid" },
+        capabilities: [{ name: "GridVoltage", type: "Sensor", description: "Grid stability and voltage parameters" }],
+        status: "Online",
+        owner: "Grid Operator",
+        organization: "Public Utility",
+        region: "US-West",
+        tags: ["grid", "substation"],
+        supportedProtocols: ["http", "ws"],
+        securityProfile: "StandardTLS"
+      });
+
+      activeTwinNetwork.addLink("pv-twin-01", "battery-twin-01", 5, 100);
+      activeTwinNetwork.addLink("battery-twin-01", "grid-twin-01", 8, 100);
+
+      // Register also in twin repository so we can query entities/state
+      const pvT = activeTwinRepository.createTwin("pv-twin-01", "Solar Field PV Array #1", "Energy");
+      pvT.addEntity({ id: "solar-panel-01", name: "Panel #1 Array", type: "PVSurface", properties: { solarOutput: 75 } });
+
+      const batT = activeTwinRepository.createTwin("battery-twin-01", "Tesla Megapack Storage Array", "Energy");
+      batT.addEntity({ id: "ess-pack-01", name: "Megapack #1 Unit", type: "BatteryPack", properties: { chargeLevel: 62 } });
+
+      const gridT = activeTwinRepository.createTwin("grid-twin-01", "Distribution Substation #4", "Energy");
+      gridT.addEntity({ id: "utility-breaker", name: "Main Feeder Breaker", type: "PowerSwitch", properties: { gridVoltage: 120 } });
+    }
+
     setTwinList(activeTwinRepository.getTwinsList());
     setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin("twin-propeller-01"));
+
+    setDistTwinDescriptors(activeTwinRegistry.getDescriptorsList());
+    setDistTwinLinks(activeTwinNetwork.getConnections());
+    setDistTwinMessages(activeTwinCommunicationBus.getHistoryLogs());
+
+    // Subscribe to Twin Communication Bus
+    const unsubscribeCommBus = activeTwinCommunicationBus.subscribe((msg) => {
+      setDistTwinMessages(activeTwinCommunicationBus.getHistoryLogs());
+    });
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
@@ -315,6 +399,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     return () => {
       unsubscribe();
       unsubscribeCollab();
+      unsubscribeCommBus();
       clearInterval(interval);
     };
   }, []);
@@ -647,6 +732,33 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     await activeSimulationBridge.runSimulation(selectedTwinId, "propeller-blade", "openfoam-mesh-solver", {});
     setTwinList(activeTwinRepository.getTwinsList());
     setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(selectedTwinId));
+  };
+
+  const handleTriggerCrossTwinSync = () => {
+    activeTwinSynchronizationCoordinator.synchronizeTwinProperty(
+      "battery-twin-01",
+      "ess-pack-01",
+      "chargeLevel",
+      95,
+      10, // version
+      0.99, // confidence
+      "Observed",
+      "HighestConfidence"
+    );
+
+    activeTwinCommunicationBus.publishMessage({
+      messageId: `msg-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      sourceTwinId: "pv-twin-01",
+      targetTwinId: "battery-twin-01",
+      type: "TwinStateChanged",
+      correlationId: `corr-${Date.now()}`,
+      payload: { propertyName: "chargeLevel", value: 95, version: 10 }
+    });
+
+    setTwinList(activeTwinRepository.getTwinsList());
+    setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(selectedTwinId));
+    setDistTwinMessages(activeTwinCommunicationBus.getHistoryLogs());
   };
 
   const filteredEvents = filterCorrelationId
@@ -2415,6 +2527,83 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 </div>
               )}
+
+              {/* 🌐 DISTRIBUTED SYSTEM OF SYSTEMS ECOSYSTEM */}
+              <div className="border-t border-slate-800 pt-4 mt-2 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-xs text-cyan-400">🌐 DISTRIBUTED SYSTEM OF SYSTEMS NETWORK</h4>
+                    <p className="text-[9px] text-slate-500">Track federated active registries, inter-twin communication logs, and coordinate synchronization policies</p>
+                  </div>
+                  <button
+                    onClick={handleTriggerCrossTwinSync}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  >
+                    Trigger Cross-Twin Sync (AITP)
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Register List */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Registered Descriptors</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                      {distTwinDescriptors.map(desc => (
+                        <div key={desc.id} className="border-b border-slate-900 pb-1.5 last:border-0 mt-1">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">{desc.displayName}</span>
+                            <span className={`px-1 rounded text-[7.5px] ${
+                              desc.status === "Online" ? "bg-emerald-950 text-emerald-400" : "bg-slate-800 text-slate-400"
+                            }`}>{desc.status}</span>
+                          </div>
+                          <div className="text-slate-500 text-[8px] mt-0.5">Endpoint: {desc.endpoint.protocol}://{desc.endpoint.host}:{desc.endpoint.port}</div>
+                          <div className="text-slate-400 text-[8px]">Capabilities: {desc.capabilities.map((c: any) => c.name).join(", ")}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Topography Links */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Ecosystem Network Links</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1 mt-1">
+                      {distTwinLinks.map((link, idx) => (
+                        <div key={idx} className="border-b border-slate-900 pb-1 last:border-0 mt-1">
+                          <div className="flex justify-between text-slate-300">
+                            <span className="font-bold">{link.fromTwinId} &rarr; {link.toTwinId}</span>
+                          </div>
+                          <div className="flex justify-between text-[8px] text-slate-500 mt-0.5">
+                            <span>Latency: {link.latencyMs}ms</span>
+                            <span>Bandwidth: {link.bandwidthMbps} Mbps</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Inter-Twin Message Bus Logs */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 col-span-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">AITP Message Bus Logs</span>
+                    <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[8px] leading-tight">
+                      {distTwinMessages.length === 0 ? (
+                        <span className="text-slate-600 italic">No AITP message exchanges recorded.</span>
+                      ) : (
+                        [...distTwinMessages].reverse().map(msg => (
+                          <div key={msg.messageId} className="border-b border-slate-900 pb-1.5 last:border-0">
+                            <div className="flex justify-between text-purple-400">
+                              <span>[{msg.type}]</span>
+                              <span className="text-slate-600">{msg.timestamp.split("T")[1].slice(0, 8)}</span>
+                            </div>
+                            <div className="text-slate-300 mt-0.5">
+                              {msg.sourceTwinId} &rarr; {msg.targetTwinId} ({msg.payload.propertyName}: {msg.payload.value})
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

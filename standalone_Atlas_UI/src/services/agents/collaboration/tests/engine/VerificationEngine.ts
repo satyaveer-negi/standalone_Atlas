@@ -9,6 +9,7 @@ import { Pillar4ComplianceTests } from "../compliance/Pillar4Tests";
 import { Pillar5ComplianceTests } from "../compliance/Pillar5Tests";
 
 import { activeTwinVerificationContributor } from "../../../../twin/verification/TwinVerificationContributor";
+import { activeDistributedTwinVerificationContributor } from "../../../../twin/distributed/verification/DistributedTwinVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -37,6 +38,10 @@ export class VerificationEngine {
     // Evaluate Digital Twin integrity checks
     const twinAsserts = activeTwinVerificationContributor.verifyTwinIntegrity();
     twinAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Distributed Twin Ecosystem checks
+    const distTwinAsserts = activeDistributedTwinVerificationContributor.verifyDistributedEcosystem();
+    distTwinAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
