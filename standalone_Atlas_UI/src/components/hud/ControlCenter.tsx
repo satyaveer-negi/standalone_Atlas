@@ -11,6 +11,9 @@ import { activeKQLQueryEngine, KQLQueryResult, KQLExplainPlan } from "../../serv
 import { activeToolAdapters, ToolAdapter, AdapterState } from "../../services/adapters/externalToolAdapters";
 import { adapterRegistry } from "../../services/adapters/adapterRegistry";
 import { activeExecutionManager, QueuedJob } from "../../services/runtime/executionManager";
+import { activeNodeRegistry, NodeDescriptor } from "../../services/runtime/nodeRegistry";
+import { activeFederationCoordinator, FederationQueryLog } from "../../services/federation/federationCoordinator";
+import { createPlatformContext } from "../../services/common/platformContext";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -30,7 +33,9 @@ type ActiveWorkspace =
   | "observability"
   | "governance"
   | "adapters"
-  | "kql";
+  | "kql"
+  | "nodes"
+  | "federation";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("health");
@@ -56,6 +61,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [kqlExplain, setKqlExplain] = useState<KQLExplainPlan[] | null>(null);
   const [executionResult, setExecutionResult] = useState<any | null>(null);
   const [jobsQueue, setJobsQueue] = useState<QueuedJob[]>([]);
+  const [nodes, setNodes] = useState<NodeDescriptor[]>([]);
+  const [federationLogs, setFederationLogs] = useState<FederationQueryLog[]>([]);
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,6 +72,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setAuditLogs(activeSecurityEngine.getAuditTrail());
     setAdapters(activeToolAdapters.getAdaptersList());
     setJobsQueue(activeExecutionManager.getQueueList());
+    setNodes(activeNodeRegistry.getNodesList());
+    setFederationLogs(activeFederationCoordinator.getQueryLogs());
 
     const interval = setInterval(() => {
       const updatedMetrics: SubsystemMetrics = {
@@ -145,10 +154,24 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
   // II.0 Handlers
   const handleExecuteKQL = async () => {
-    const res = await activeKQLQueryEngine.executeQueryAsync(kqlQuery);
-    setKqlResult(res);
+    const cleanQuery = kqlQuery.trim().replace(/\s+/g, " ");
+    if (cleanQuery.toUpperCase().startsWith("MATCH FEDERATEDNODE")) {
+      const qContext = createPlatformContext("q-fed-101", "tr-fed-101");
+      const rows = await activeFederationCoordinator.coordinateFederatedQuery(qContext.queryId, cleanQuery);
+      setKqlResult({
+        headers: ["nodeName", "location", "status", "queryLatencyMs"],
+        rows
+      });
+      setFederationLogs([...activeFederationCoordinator.getQueryLogs()]);
+      setMockLogs(prev => [
+        ...prev,
+        `[Federation Coordinator] Federated query executed. correlationId: ${qContext.correlationId}`
+      ]);
+    } else {
+      const res = await activeKQLQueryEngine.executeQueryAsync(kqlQuery);
+      setKqlResult(res);
+    }
     setKqlExplain(null);
-    setMockLogs(prev => [...prev, `[KQL Query] Executed successfully. Returned ${res.rows.length} rows.`]);
   };
 
   const handleExplainKQL = () => {
@@ -317,6 +340,26 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🕸️ KQL Console
+          </button>
+          <button
+            onClick={() => setActiveTab("nodes")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "nodes"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            🖥️ Node Registry
+          </button>
+          <button
+            onClick={() => setActiveTab("federation")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "federation"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            📡 Federation
           </button>
           <button
             onClick={() => setActiveTab("observability")}
@@ -892,6 +935,71 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "nodes" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">🖥️ DISTRIBUTED NODE REGISTRY</h3>
+                <p className="text-[10px] text-slate-500">Live heartbeat monitoring and node load metrics</p>
+              </div>
+              <table className="w-full text-left border-collapse text-[10px]">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-500 font-bold">
+                    <th className="py-1">Node ID</th>
+                    <th className="py-1">Endpoint</th>
+                    <th className="py-1">Latency</th>
+                    <th className="py-1">State</th>
+                    <th className="py-1">Capacity/Load</th>
+                    <th className="py-1">Health Score</th>
+                    <th className="py-1 text-right">Heartbeat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nodes.map(n => (
+                    <tr key={n.nodeId} className="border-b border-slate-900/60 hover:bg-slate-900/20">
+                      <td className="py-2.5 font-bold text-slate-200">
+                        {n.name} <div className="text-[9px] text-slate-500 font-mono mt-0.5">{n.capabilities.join(", ")}</div>
+                      </td>
+                      <td className="py-2.5 font-mono text-slate-400">{n.endpoint}</td>
+                      <td className="py-2.5 font-mono text-cyan-400">{n.latency} ms</td>
+                      <td className="py-2.5 font-mono">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          n.state === "ONLINE" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-500"
+                        }`}>{n.state}</span>
+                      </td>
+                      <td className="py-2.5 font-mono text-slate-350">{n.currentLoad}/{n.maxCapacity} MB</td>
+                      <td className="py-2.5 font-bold text-cyan-300">{n.healthScore}%</td>
+                      <td className="py-2.5 text-right text-slate-500 font-mono">{n.lastHeartbeat}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {activeTab === "federation" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">📡 FEDERATION COORDINATOR STATUS</h3>
+                <p className="text-[10px] text-slate-500">Multi-node fan-out execution logs and merge steps</p>
+              </div>
+              <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto">
+                {federationLogs.length === 0 ? (
+                  <span className="text-slate-500 font-mono italic">No active federated queries. Run "MATCH FederatedNode" to test.</span>
+                ) : (
+                  federationLogs.map((log, index) => (
+                    <div key={index} className="p-2.5 bg-slate-900 border border-slate-850 rounded flex flex-col gap-1 text-[10px] font-mono">
+                      <div className="flex justify-between border-b border-slate-850/60 pb-1">
+                        <span className="text-purple-300 font-bold">Stage: {log.stage} (Query ID: {log.queryId})</span>
+                        <span className="text-slate-500">{log.timestamp}</span>
+                      </div>
+                      <p className="text-slate-400 mt-1">{log.details}</p>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
