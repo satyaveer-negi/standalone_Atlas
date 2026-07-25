@@ -83,6 +83,7 @@ import { activeWorkflowGenerator } from "../../services/workflow/orchestration/W
 import { activeExplainabilityEngine } from "../../services/workflow/orchestration/ExplainabilityEngine";
 import { activeScenarioRepository } from "../../services/workflow/scenarios/ScenarioRepository";
 import { activeScenarioComparator } from "../../services/workflow/scenarios/ScenarioComparator";
+import { WorkflowGraph } from "../../services/workflow/model/WorkflowGraph";
 import type { WorkflowDefinition as VisualWorkflowDefinition } from "../../services/workflow/model/WorkflowDefinition";
 import type { Scenario } from "../../services/workflow/scenarios/Scenario";
 import "../../services/kql/federatedQueryProvider";
