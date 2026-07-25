@@ -66,6 +66,11 @@ import { activeCapabilityRegistry } from "../../services/agents/collaboration/re
 import type { AgentDescriptor } from "../../services/agents/collaboration/registry/AgentDescriptor";
 import { activeCollaborationTestSuite } from "../../services/agents/collaboration/tests/collaborationTestSuite";
 import type { TestResult } from "../../services/agents/collaboration/tests/reports/VerificationReport";
+import { activeTwinRepository } from "../../services/twin/core/TwinRepository";
+import { activeTwinStateEngine } from "../../services/twin/state/TwinStateEngine";
+import { activeSyncManager } from "../../services/twin/sync/SyncManager";
+import { activeSimulationBridge } from "../../services/twin/simulation/SimulationBridge";
+import { activeTwinIntelligence } from "../../services/twin/intelligence/TwinIntelligence";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -185,6 +190,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [collabRunning, setCollabRunning] = useState(false);
   const [collabTestResults, setCollabTestResults] = useState<TestResult[]>([]);
   const [collabTestRunning, setCollabTestRunning] = useState(false);
+  const [twinList, setTwinList] = useState<any[]>([]);
+  const [selectedTwinId, setSelectedTwinId] = useState<string>("twin-propeller-01");
+  const [twinDiagnosis, setTwinDiagnosis] = useState<any>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -210,6 +218,71 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setCollabNodes(activeSharedTaskGraph.getNodes());
     setCollabVariables(activeVariableStore.getVariablesList());
     setCollabEvents(activeCollabEventBus.getEventHistory());
+
+    // Initialize Mock Digital Twin
+    let mockTwin = activeTwinRepository.getTwin("twin-propeller-01");
+    if (!mockTwin) {
+      mockTwin = activeTwinRepository.createTwin("twin-propeller-01", "C-130 Hercules Propeller Twin", "Aerodynamics");
+      mockTwin.addEntity({
+        id: "propeller-blade",
+        name: "Propeller Blade #1",
+        type: "MechanicalBlade",
+        properties: { temperature: 310, meshOrthogonality: 85 }
+      });
+      mockTwin.addEntity({
+        id: "blade-sensor",
+        name: "Telemetry Heat Sensor",
+        type: "ThermalSensor",
+        properties: { status: "Active" }
+      });
+      mockTwin.addRelationship({
+        id: "rel-sensor-blade",
+        sourceEntityId: "blade-sensor",
+        targetEntityId: "propeller-blade",
+        type: "Control"
+      });
+
+      // Register mock sync adapter
+      activeSyncManager.registerAdapter("twin-propeller-01", {
+        id: "mock-propeller-sensor-telemetry",
+        name: "Propeller Thermocouple Sensor Feed",
+        fetchUpdates: async () => [
+          {
+            entityId: "propeller-blade",
+            propertyName: "temperature",
+            value: 320 + Math.floor(Math.random() * 20),
+            unit: "Kelvin",
+            provenance: "Observed",
+            confidence: 0.98
+          },
+          {
+            entityId: "propeller-blade",
+            propertyName: "meshOrthogonality",
+            value: 80 - Math.floor(Math.random() * 10),
+            unit: "Percent",
+            provenance: "Estimated",
+            confidence: 0.9
+          }
+        ]
+      });
+
+      // Register mock simulation provider
+      activeSimulationBridge.registerProvider({
+        id: "openfoam-mesh-solver",
+        name: "OpenFOAM Turbulence Solver Engine",
+        runSolver: async () => [
+          {
+            propertyName: "meshOrthogonality",
+            value: 92,
+            unit: "Percent",
+            confidence: 0.99
+          }
+        ]
+      });
+    }
+
+    setTwinList(activeTwinRepository.getTwinsList());
+    setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin("twin-propeller-01"));
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
@@ -564,6 +637,18 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     }
   };
 
+  const handleTriggerSync = async () => {
+    await activeSyncManager.triggerSync(selectedTwinId);
+    setTwinList(activeTwinRepository.getTwinsList());
+    setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(selectedTwinId));
+  };
+
+  const handleTriggerSimulation = async () => {
+    await activeSimulationBridge.runSimulation(selectedTwinId, "propeller-blade", "openfoam-mesh-solver", {});
+    setTwinList(activeTwinRepository.getTwinsList());
+    setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(selectedTwinId));
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -727,6 +812,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🤖 Autonomous Agents
+          </button>
+          <button
+            onClick={() => setActiveTab("twinStudio")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "twinStudio"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            ♊ Digital Twin Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -2181,6 +2276,145 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === "twinStudio" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">♊ EIOS DIGITAL TWIN STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Live operational synchronization, external solvers bridges, and predictive intelligence loops</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400">Selected Twin:</span>
+                  <select
+                    value={selectedTwinId}
+                    onChange={(e) => {
+                      setSelectedTwinId(e.target.value);
+                      setTwinDiagnosis(activeTwinIntelligence.diagnoseTwin(e.target.value));
+                    }}
+                    className="bg-slate-900 border border-slate-800 rounded text-xs px-2 py-1 text-cyan-300"
+                  >
+                    {twinList.map(t => (
+                      <option key={t.metadata.id} value={t.metadata.id}>{t.metadata.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {activeTwinRepository.getTwin(selectedTwinId) && (
+                <div className="grid grid-cols-4 gap-4">
+                  {/* Panel 1: Topology Asset Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Topology & Entities</span>
+                    <div className="max-h-[160px] overflow-y-auto flex flex-col gap-2 mt-1">
+                      <div>
+                        <span className="text-cyan-400 font-bold text-[8.5px]">Entities:</span>
+                        {activeTwinRepository.getTwin(selectedTwinId)?.entities.map(ent => (
+                          <div key={ent.id} className="border-b border-slate-900 pb-1 mt-1">
+                            <div className="text-slate-300 font-bold">{ent.name}</div>
+                            <div className="text-slate-500 text-[8px]">Type: {ent.type}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-cyan-400 font-bold text-[8.5px]">Relationships:</span>
+                        {activeTwinRepository.getTwin(selectedTwinId)?.relationships.map(rel => (
+                          <div key={rel.id} className="text-[8px] text-slate-400 mt-1">
+                            {rel.sourceEntityId} &rarr; [{rel.type}] &rarr; {rel.targetEntityId}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Panel 2: Live State & Provenance */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono col-span-1">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. State & Provenance</span>
+                    <div className="max-h-[160px] overflow-y-auto flex flex-col gap-2 mt-1">
+                      {activeTwinRepository.getTwin(selectedTwinId)?.entities.map(ent => (
+                        <div key={ent.id}>
+                          <span className="text-slate-500 text-[8px] font-bold">{ent.name}:</span>
+                          {Object.keys(ent.properties).map(prop => {
+                            const latestState = activeTwinStateEngine.getLatestProperty(selectedTwinId, ent.id, prop);
+                            return (
+                              <div key={prop} className="border-b border-slate-900 pb-1.5 last:border-0 mt-1">
+                                <div className="flex justify-between">
+                                  <span className="text-cyan-400 font-bold">{prop}</span>
+                                  <span className="text-slate-100 font-bold">{ent.properties[prop]} {latestState?.unit}</span>
+                                </div>
+                                {latestState && (
+                                  <div className="flex justify-between text-[7.5px] text-slate-500 mt-0.5">
+                                    <span>Src: {latestState.versionInfo.provenance} (v{latestState.versionInfo.version})</span>
+                                    <span>Conf: {Math.round(latestState.versionInfo.confidence * 100)}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Panel 3: Synchronization Controls */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Sync & Solver Controls</span>
+                    <div className="flex flex-col gap-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Sync Status:</span>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold bg-slate-800 text-cyan-300`}>
+                          {activeTwinRepository.getTwin(selectedTwinId)?.syncState}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleTriggerSync}
+                        className="w-full bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold py-1 rounded text-[9px] cursor-pointer"
+                      >
+                        Fetch Sensor Telemetry (Sync)
+                      </button>
+                      <button
+                        onClick={handleTriggerSimulation}
+                        className="w-full bg-purple-600 hover:bg-purple-500 text-slate-100 font-bold py-1 rounded text-[9px] cursor-pointer mt-1"
+                      >
+                        Trigger Mesh Solver (OpenFOAM)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Panel 4: Twin Diagnostics & Alerts */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1 text-[9px] font-mono">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Twin Diagnosis & Alerts</span>
+                    <div className="max-h-[160px] overflow-y-auto flex flex-col gap-2 mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Health Index:</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          twinDiagnosis?.healthScore > 80 ? "bg-emerald-900/30 text-emerald-400" : "bg-yellow-900/30 text-yellow-400"
+                        }`}>{twinDiagnosis?.healthScore}%</span>
+                      </div>
+                      <div>
+                        <span className="text-red-400 font-bold text-[8.5px]">Anomalies:</span>
+                        {twinDiagnosis?.anomaliesList.length === 0 ? (
+                          <div className="text-slate-600 italic text-[8px]">No anomalies flagged.</div>
+                        ) : (
+                          twinDiagnosis?.anomaliesList.map((an: any, idx: number) => (
+                            <div key={idx} className="text-[8px] text-red-350 leading-tight border-b border-slate-900 pb-1 mt-1">
+                              [{an.severity}] {an.propertyName} limit exceeded: {an.value} (Limit {an.thresholdLimit})
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <div className="mt-1">
+                        <span className="text-emerald-400 font-bold text-[8.5px]">Recommendations:</span>
+                        {twinDiagnosis?.recommendations.map((rec: string, idx: number) => (
+                          <p key={idx} className="text-slate-300 text-[8px] leading-tight mt-1">{rec}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

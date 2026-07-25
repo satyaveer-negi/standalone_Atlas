@@ -8,6 +8,8 @@ import { Pillar3ComplianceTests } from "../compliance/Pillar3Tests";
 import { Pillar4ComplianceTests } from "../compliance/Pillar4Tests";
 import { Pillar5ComplianceTests } from "../compliance/Pillar5Tests";
 
+import { activeTwinVerificationContributor } from "../../../../twin/verification/TwinVerificationContributor";
+
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
   private assertionRunner = new AssertionRunner();
@@ -31,6 +33,10 @@ export class VerificationEngine {
     // 2. Evaluate Assertion checks
     const assertions = this.assertionRunner.runAllAssertions();
     assertions.forEach(ast => report.addResult(ast));
+
+    // Evaluate Digital Twin integrity checks
+    const twinAsserts = activeTwinVerificationContributor.verifyTwinIntegrity();
+    twinAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
