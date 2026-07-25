@@ -64,6 +64,8 @@ import type { TaskNode } from "../../services/agents/collaboration/graph/TaskNod
 import type { Variable } from "../../services/agents/collaboration/graph/Variable";
 import { activeCapabilityRegistry } from "../../services/agents/collaboration/registry/CapabilityRegistry";
 import type { AgentDescriptor } from "../../services/agents/collaboration/registry/AgentDescriptor";
+import { activeCollaborationTestSuite } from "../../services/agents/collaboration/tests/collaborationTestSuite";
+import type { TestResult } from "../../services/agents/collaboration/tests/reports/VerificationReport";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -181,6 +183,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [collabVariables, setCollabVariables] = useState<Variable[]>([]);
   const [collabAgents, setCollabAgents] = useState<AgentDescriptor[]>([]);
   const [collabRunning, setCollabRunning] = useState(false);
+  const [collabTestResults, setCollabTestResults] = useState<TestResult[]>([]);
+  const [collabTestRunning, setCollabTestRunning] = useState(false);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -539,6 +543,21 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       console.error("[Control Center] Collaborative Orchestration Crash:", err);
     } finally {
       setCollabRunning(false);
+      setCollabNodes(activeSharedTaskGraph.getNodes());
+      setCollabVariables(activeVariableStore.getVariablesList());
+      setCollabEvents(activeCollabEventBus.getEventHistory());
+    }
+  };
+
+  const handleRunCollabTestSuite = async () => {
+    setCollabTestRunning(true);
+    try {
+      const results = await activeCollaborationTestSuite.runSuite(collabGoalPrompt);
+      setCollabTestResults(results);
+    } catch (err) {
+      console.error("[Control Center] Collaboration test suite execution crashed:", err);
+    } finally {
+      setCollabTestRunning(false);
       setCollabNodes(activeSharedTaskGraph.getNodes());
       setCollabVariables(activeVariableStore.getVariablesList());
       setCollabEvents(activeCollabEventBus.getEventHistory());
@@ -2107,6 +2126,60 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* 🛡️ EIOS INTEGRATED VERIFICATION & VALIDATION (VV&QA) DASHBOARD */}
+              <div className="border-t border-slate-800 pt-4 mt-2 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-xs text-emerald-400">🛡️ EIOS INTEGRATION VERIFICATION CONSOLE</h4>
+                    <p className="text-[9px] text-slate-500">Run suite scenarios, check cycle detection validation, and audit EIOS Constitutional compliance invariants</p>
+                  </div>
+                  <button
+                    onClick={handleRunCollabTestSuite}
+                    disabled={collabTestRunning}
+                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-slate-900 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  >
+                    {collabTestRunning ? "Verifying..." : "Run Integration Test Suite"}
+                  </button>
+                </div>
+
+                {collabTestResults.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4 text-[9px] font-mono">
+                    {/* Panel 1: Functional Assertions Summary */}
+                    <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                      <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Assertions Validation Checklist</span>
+                      <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                        {collabTestResults.filter(r => !r.id.startsWith("compliance")).map(res => (
+                          <div key={res.id} className="flex justify-between items-center border-b border-slate-900 pb-1 last:border-0">
+                            <span className="text-slate-300">{res.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-500 text-[8px]">({res.durationMs}ms)</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                res.status === "Pass" ? "bg-emerald-900/30 text-emerald-400" : "bg-red-900/30 text-red-400"
+                              }`}>{res.status}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Panel 2: EIOS Constitutional Compliance Check */}
+                    <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1">
+                      <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">EIOS Constitutional Quality Gates</span>
+                      <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                        {collabTestResults.filter(r => r.id.startsWith("compliance")).map(res => (
+                          <div key={res.id} className="flex justify-between items-center border-b border-slate-900 pb-1 last:border-0">
+                            <span className="text-slate-300">{res.name}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                              res.status === "Pass" ? "bg-emerald-900/30 text-emerald-400" : "bg-red-900/30 text-red-400"
+                            }`}>{res.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
