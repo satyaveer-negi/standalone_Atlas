@@ -1,16 +1,16 @@
-import { activeWorkflowRepository } from "../../workflowRepository";
+import { activeKnowledgeGraph } from "../../workflowKnowledgeGraph";
 
 export class KnowledgeRetriever {
   public retrieveSimilarTemplates(prompt: string): string {
-    const existing = activeWorkflowRepository.getPackagesList();
-    const matches = existing.filter(p => 
-      p.metadata.packageName.toLowerCase().includes(prompt.toLowerCase()) ||
-      p.definition.description.toLowerCase().includes(prompt.toLowerCase())
-    );
-
-    if (matches.length > 0) {
-      return `Found ${matches.length} matching template assets in local repository. Grounding prompt context in: ${matches.map(m => m.metadata.packageName).join(", ")}.`;
+    const isCfd = prompt.toLowerCase().includes("cfd") || prompt.toLowerCase().includes("fluid") || prompt.toLowerCase().includes("mesh");
+    const domainNodeId = isCfd ? "domain-cfd" : "domain-math";
+    
+    const related = activeKnowledgeGraph.findRelatedEntities(domainNodeId);
+    if (related.length > 0) {
+      const capabilities = related.filter(r => r.node.type === "Capability").map(r => r.node.label);
+      const reviewers = related.filter(r => r.node.type === "Reviewer").map(r => r.node.label);
+      return `Grounding Context in Semantic Knowledge Graph: Domain "${isCfd ? "Fluid Dynamics" : "Numerical Computation"}" requires capabilities (${capabilities.join(", ")}) and matches Reviewer Profile (${reviewers.join(", ")}).`;
     }
-    return "No highly correlated templates found in the repository. Grounding reasoning on universal engineering schemas.";
+    return "No semantic paths found in Knowledge Graph. Defaulting to general schema guidelines.";
   }
 }
