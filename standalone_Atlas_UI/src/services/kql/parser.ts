@@ -1,3 +1,7 @@
+import { activeKQLPlanner } from "./planner";
+import { activeKQLExecutor } from "./executor";
+import { queryProviderRegistry } from "./providerRegistry";
+
 export interface KQLExplainPlan {
   stage: string;
   durationMs: number;
@@ -10,71 +14,59 @@ export interface KQLQueryResult {
   diagnostics?: string;
 }
 
-// 🕸️ PROGRAM V1: KNOWLEDGE QUERY SERVICE
 export class KQLQueryEngine {
-  public executeKQL(query: string): KQLQueryResult {
+  public async executeQueryAsync(query: string): Promise<KQLQueryResult> {
     const cleanQuery = query.trim().replace(/\s+/g, " ");
+    const match = cleanQuery.match(/MATCH\s+(\w+)(?:\s+WHERE\s+(.+))?/i);
 
-    if (cleanQuery.toUpperCase().startsWith("MATCH PACKAGE")) {
-      const isGold = cleanQuery.toUpperCase().includes("CERTIFICATION = GOLD");
-      const isPlatinum = cleanQuery.toUpperCase().includes("CERTIFICATION = PLATINUM");
+    if (!match) {
+      return {
+        headers: ["error"],
+        rows: [],
+        diagnostics: `KQL Syntax Error: Malformed match query syntax in "${query}".`
+      };
+    }
 
-      let rows = [
-        { id: "software", version: "1.0.0", quality: "Gold", status: "Installed" },
-        { id: "openfoam", version: "1.2.0", quality: "Platinum", status: "Active" },
-        { id: "literature", version: "2.1.0", quality: "Gold", status: "Installed" },
-        { id: "research", version: "1.0.0", quality: "Silver", status: "Available" },
-        { id: "education", version: "1.5.0", quality: "Platinum", status: "Available" },
-      ];
+    const entityName = match[1];
+    const conditions = match[2] || "";
 
-      if (isGold) {
-        rows = rows.filter(r => r.quality === "Gold");
-      } else if (isPlatinum) {
-        rows = rows.filter(r => r.quality === "Platinum");
-      }
+    try {
+      const plan = activeKQLPlanner.buildPlan(entityName, conditions);
+      const rows = await activeKQLExecutor.executePlan(plan);
+      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
 
       return {
-        headers: ["id", "version", "quality", "status"],
+        headers,
         rows
       };
-    }
-
-    if (cleanQuery.toUpperCase().startsWith("MATCH RUNTIME")) {
+    } catch (err: any) {
       return {
-        headers: ["component", "status", "memory"],
-        rows: [
-          { component: "knowledgeRuntime", status: "ACTIVE", memory: "1.2 MB" },
-          { component: "learningRuntime", status: "UNLOADED", memory: "0 KB" }
-        ]
+        headers: ["error"],
+        rows: [],
+        diagnostics: err.message || `No Query Provider registered for target entity: "${entityName}"`
       };
     }
-
-    if (cleanQuery.toUpperCase().startsWith("MATCH ADAPTER")) {
-      return {
-        headers: ["name", "version", "state"],
-        rows: [
-          { name: "ONLYOFFICE", version: "7.2.1", state: "Connected" },
-          { name: "Docker Solver", version: "20.10", state: "Connecting" },
-          { name: "OpenFOAM Adapter", version: "1.0", state: "Available" }
-        ]
-      };
-    }
-
-    return {
-      headers: ["error"],
-      rows: [],
-      diagnostics: `KQL Syntax Error: Unsupported entity match expression in "${query}".`
-    };
   }
 
   public explainQuery(query: string): KQLExplainPlan[] {
-    console.log(`[KQL Explain] Parsing query plan for: "${query}"`);
+    const cleanQuery = query.trim().replace(/\s+/g, " ");
+    const match = cleanQuery.match(/MATCH\s+(\w+)(?:\s+WHERE\s+(.+))?/i);
+    const entityName = match ? match[1] : "Unknown";
+
+    let providerSteps: string[] = ["Default Table Scan"];
+    try {
+      if (match) {
+        const provider = queryProviderRegistry.resolveProvider(entityName);
+        const plan = provider.explain({});
+        providerSteps = plan.steps;
+      }
+    } catch (e) {}
+
     return [
-      { stage: "Tokenize Query", durationMs: 2, description: "Splitting input string into SQL/Graph lexer lexemes." },
-      { stage: "Parse AST", durationMs: 4, description: "Constructing Abstract Syntax Tree nodes for matching selectors." },
-      { stage: "Validate Schema", durationMs: 3, description: "Confirming matched target is a registered AKG entity structure." },
-      { stage: "Build Execution Plan", durationMs: 2, description: "Optimizing search index fetches on persistent traces store." },
-      { stage: "Execute Match", durationMs: 6, description: "Scanning package registry database rows." },
+      { stage: "Tokenize Query", durationMs: 2, description: "Splitting query terms into syntax tokens." },
+      { stage: "Parse AST", durationMs: 4, description: `Building Abstract Syntax Tree for entity target: "${entityName}".` },
+      { stage: "Validate Schema", durationMs: 3, description: "Verifying target exists in platform configuration." },
+      { stage: "Query Provider Scan", durationMs: 6, description: `Dispatched to Provider: [${providerSteps.join(" -> ")}]` },
     ];
   }
 }

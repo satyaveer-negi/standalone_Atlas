@@ -136,8 +136,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   };
 
   // II.0 Handlers
-  const handleExecuteKQL = () => {
-    const res = activeKQLQueryEngine.executeKQL(kqlQuery);
+  const handleExecuteKQL = async () => {
+    const res = await activeKQLQueryEngine.executeQueryAsync(kqlQuery);
     setKqlResult(res);
     setKqlExplain(null);
     setMockLogs(prev => [...prev, `[KQL Query] Executed successfully. Returned ${res.rows.length} rows.`]);
