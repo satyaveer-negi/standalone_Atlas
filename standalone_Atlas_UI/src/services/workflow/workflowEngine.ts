@@ -1,8 +1,10 @@
 import { WorkflowDefinition, WorkflowInstance, WorkflowStep, WorkflowState, StepState } from "./workflowDefinition";
 import { activeRuntimeScheduler } from "../runtime/scheduler";
 import { activeExecutionManager } from "../runtime/executionManager";
+import { activeWorkflowEventBus } from "./workflowEvents";
+import { createPlatformContext } from "../common/platformContext";
 
-// 🕸️ PROGRAM III.0: GENERALIZED WORKFLOW ORCHESTRATOR ENGINE
+// 🕸️ PROGRAM III.0 & III.1: GENERALIZED EVENT-DRIVEN WORKFLOW ORCHESTRATOR ENGINE
 export class WorkflowEngine {
   private templates = new Map<string, WorkflowDefinition>();
   private instances = new Map<string, WorkflowInstance>();
@@ -72,6 +74,18 @@ export class WorkflowEngine {
     instance.steps[0].state = "Ready";
 
     this.instances.set(instanceId, instance);
+
+    // Publish event
+    const context = createPlatformContext(instanceId);
+    activeWorkflowEventBus.publish({
+      eventId: `evt-cr-${Date.now()}`,
+      workflowId: instanceId,
+      timestamp: new Date().toLocaleTimeString(),
+      eventType: "WorkflowCreated",
+      platformContext: context,
+      payload: { definitionId: defId }
+    });
+
     console.log(`[Workflow Engine] Created workflow instance "${instanceId}" from definition "${defId}"`);
     return instance;
   }
@@ -83,23 +97,58 @@ export class WorkflowEngine {
     const step = instance.steps.find(s => s.stepId === stepId);
     if (!step || step.state !== "Ready") return;
 
+    const context = createPlatformContext(instanceId);
+
+    // Publish event StepStarted
+    activeWorkflowEventBus.publish({
+      eventId: `evt-ss-${Date.now()}`,
+      workflowId: instanceId,
+      stepId,
+      timestamp: new Date().toLocaleTimeString(),
+      eventType: "StepStarted",
+      platformContext: context,
+      payload: { capability: step.capability }
+    });
+
     instance.state = "Running";
     step.state = "Running";
 
     // 1. Scheduler Node Selection
-    const selectedNode = activeRuntimeScheduler.scheduleTask(step.capability);
-    step.assignedNode = selectedNode.name;
-    instance.activeNodeCount = 1;
-
-    console.log(`[Workflow Engine] Step "${stepId}" scheduled on node: "${selectedNode.name}"`);
-
-    // 2. Dispatch to Execution Manager
     try {
-      const adapterKey = selectedNode.nodeId === "node-local" ? "openfoam" : "python";
+      const decision = activeRuntimeScheduler.scheduleTask(step.capability);
+      step.assignedNode = decision.selectedNode.name;
+      instance.activeNodeCount = 1;
+
+      // Publish event SchedulingDecisionMade
+      activeWorkflowEventBus.publish({
+        eventId: `evt-sd-${Date.now()}`,
+        workflowId: instanceId,
+        stepId,
+        timestamp: new Date().toLocaleTimeString(),
+        eventType: "SchedulingDecisionMade",
+        platformContext: context,
+        payload: { decision }
+      });
+
+      console.log(`[Workflow Engine] Step "${stepId}" scheduled on node: "${decision.selectedNode.name}"`);
+
+      // 2. Dispatch to Execution Manager
+      const adapterKey = decision.selectedNode.nodeId === "node-local" ? "openfoam" : "python";
       const start = Date.now();
       await activeExecutionManager.executeJob(adapterKey, `run-step-${stepId}`);
       step.elapsedTimeMs = Date.now() - start;
       step.state = "Completed";
+
+      // Publish event StepCompleted
+      activeWorkflowEventBus.publish({
+        eventId: `evt-sc-${Date.now()}`,
+        workflowId: instanceId,
+        stepId,
+        timestamp: new Date().toLocaleTimeString(),
+        eventType: "StepCompleted",
+        platformContext: context,
+        payload: { durationMs: step.elapsedTimeMs }
+      });
 
       // Enable dependent steps
       const template = this.templates.get(instance.definitionId);
@@ -115,10 +164,27 @@ export class WorkflowEngine {
       const activePending = instance.steps.some(s => s.state !== "Completed");
       if (!activePending) {
         instance.state = "Completed";
+        activeWorkflowEventBus.publish({
+          eventId: `evt-wc-${Date.now()}`,
+          workflowId: instanceId,
+          timestamp: new Date().toLocaleTimeString(),
+          eventType: "WorkflowCompleted",
+          platformContext: context,
+          payload: {}
+        });
       }
     } catch (err) {
       step.state = "Failed";
       instance.state = "Failed";
+      activeWorkflowEventBus.publish({
+        eventId: `evt-sf-${Date.now()}`,
+        workflowId: instanceId,
+        stepId,
+        timestamp: new Date().toLocaleTimeString(),
+        eventType: "StepFailed",
+        platformContext: context,
+        payload: { error: (err as any).message }
+      });
     }
   }
 }

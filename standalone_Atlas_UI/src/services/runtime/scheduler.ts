@@ -1,5 +1,14 @@
 import { NodeDescriptor, activeNodeRegistry } from "./nodeRegistry";
 
+export interface SchedulingDecision {
+  selectedNode: NodeDescriptor;
+  selectedPolicy: string;
+  score: number;
+  reasoning: string;
+  alternatives: string[];
+  timestamp: string;
+}
+
 // 🖥️ PLUGGABLE SCHEDULER POLICY CONTRACT
 export interface SchedulerPolicy {
   readonly name: string;
@@ -37,7 +46,7 @@ export class LowestLatencyPolicy implements SchedulerPolicy {
   }
 }
 
-// 🛡️ Runtime Scheduler Controller
+// 🛡️ Runtime Scheduler Controller (REPORTS EXPLAINABLE SCHEDULING DECISONS)
 export class RuntimeScheduler {
   private currentPolicy: SchedulerPolicy = new LeastLoadedPolicy();
 
@@ -50,7 +59,7 @@ export class RuntimeScheduler {
     console.log(`[Scheduler] Switched scheduling policy to: "${policy.name}"`);
   }
 
-  public scheduleTask(capability: string): NodeDescriptor {
+  public scheduleTask(capability: string): SchedulingDecision {
     const nodes = activeNodeRegistry.getNodesList();
     const candidateNodes = nodes.filter(n => n.capabilities.includes(capability));
 
@@ -59,8 +68,22 @@ export class RuntimeScheduler {
     }
 
     const selected = this.currentPolicy.select(candidateNodes);
-    console.log(`[Scheduler] Selected node "${selected.name}" via policy "${this.currentPolicy.name}"`);
-    return selected;
+    const score = this.currentPolicy.score(selected);
+    const alternatives = candidateNodes
+      .filter(n => n.nodeId !== selected.nodeId)
+      .map(n => `${n.name} (Score: ${Math.floor(this.currentPolicy.score(n))})`);
+
+    const decision: SchedulingDecision = {
+      selectedNode: selected,
+      selectedPolicy: this.currentPolicy.name,
+      score: Math.floor(score),
+      reasoning: `Selected "${selected.name}" due to highest capability compliance match under ${this.currentPolicy.name}.`,
+      alternatives,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    console.log(`[Scheduler] Decision made: selected "${selected.name}"`);
+    return decision;
   }
 }
 
