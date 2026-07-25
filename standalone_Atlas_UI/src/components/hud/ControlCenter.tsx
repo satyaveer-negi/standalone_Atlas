@@ -25,6 +25,9 @@ import type { NodeDescriptor } from "../../services/runtime/nodeRegistry";
 import { activeFederationCoordinator } from "../../services/federation/federationCoordinator";
 import type { FederationQueryLog } from "../../services/federation/federationCoordinator";
 import { createPlatformContext } from "../../services/common/platformContext";
+import { activeWorkflowEngine } from "../../services/workflow/workflowEngine";
+import type { WorkflowDefinition, WorkflowInstance, WorkflowStep } from "../../services/workflow/workflowDefinition";
+import { activeRuntimeScheduler, LeastLoadedPolicy, LowestLatencyPolicy } from "../../services/runtime/scheduler";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -46,7 +49,8 @@ type ActiveWorkspace =
   | "adapters"
   | "kql"
   | "nodes"
-  | "federation";
+  | "federation"
+  | "workflows";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("health");
@@ -76,6 +80,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [federationLogs, setFederationLogs] = useState<FederationQueryLog[]>([]);
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
 
+  // III.0 States
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowDefinition[]>([]);
+  const [workflowInstances, setWorkflowInstances] = useState<WorkflowInstance[]>([]);
+  const [schedulerPolicy, setSchedulerPolicy] = useState(activeRuntimeScheduler.getPolicyName());
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
@@ -85,6 +94,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setJobsQueue(activeExecutionManager.getQueueList());
     setNodes(activeNodeRegistry.getNodesList());
     setFederationLogs(activeFederationCoordinator.getQueryLogs());
+    setWorkflowTemplates(activeWorkflowEngine.getTemplatesList());
+    setWorkflowInstances(activeWorkflowEngine.getInstancesList());
 
     const interval = setInterval(() => {
       const updatedMetrics: SubsystemMetrics = {
@@ -168,7 +179,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     const cleanQuery = kqlQuery.trim().replace(/\s+/g, " ");
     if (cleanQuery.toUpperCase().startsWith("MATCH FEDERATEDNODE")) {
       const qContext = createPlatformContext("q-fed-101", "tr-fed-101");
-      const rows = await activeFederationCoordinator.coordinateFederatedQuery(qContext.queryId, cleanQuery);
+      const rows = await activeFederationCoordinator.coordinateFederatedQuery(qContext.identity.queryId, cleanQuery);
       setKqlResult({
         headers: ["nodeName", "location", "status", "queryLatencyMs"],
         rows
@@ -176,7 +187,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       setFederationLogs([...activeFederationCoordinator.getQueryLogs()]);
       setMockLogs(prev => [
         ...prev,
-        `[Federation Coordinator] Federated query executed. correlationId: ${qContext.correlationId}`
+        `[Federation Coordinator] Federated query executed. correlationId: ${qContext.identity.correlationId}`
       ]);
     } else {
       const res = await activeKQLQueryEngine.executeQueryAsync(kqlQuery);
@@ -232,6 +243,29 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setMockLogs(prev => [...prev, `[Execution Manager] Cancelled job: "${jobId}".`]);
   };
 
+  // III.0 Handlers
+  const handleTogglePolicy = () => {
+    if (schedulerPolicy.includes("Loaded")) {
+      activeRuntimeScheduler.setPolicy(new LowestLatencyPolicy());
+    } else {
+      activeRuntimeScheduler.setPolicy(new LeastLoadedPolicy());
+    }
+    setSchedulerPolicy(activeRuntimeScheduler.getPolicyName());
+    setNodes(activeNodeRegistry.getNodesList());
+  };
+
+  const handleInstantiateWorkflow = (defId: string) => {
+    activeWorkflowEngine.createInstance(defId);
+    setWorkflowInstances(activeWorkflowEngine.getInstancesList());
+  };
+
+  const handleRunWorkflowStep = async (instId: string, stepId: string) => {
+    await activeWorkflowEngine.runInstanceStep(instId, stepId);
+    setWorkflowInstances(activeWorkflowEngine.getInstancesList());
+    setNodes(activeNodeRegistry.getNodesList());
+    setJobsQueue([...activeExecutionManager.getQueueList()]);
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 h-[400px] border-t border-cyan-500/40 bg-slate-950/95 backdrop-blur-2xl z-50 text-slate-100 flex flex-col font-sans shadow-2xl">
       {/* 🧭 Header Console Spine */}
@@ -252,6 +286,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* 🗂️ Left Workspace Navigation Sidebar */}
         <div className="w-48 bg-slate-900/60 border-r border-slate-800 flex flex-col p-2 gap-1 overflow-y-auto">
+          {/* Group 1: Runtime Operations */}
+          <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider">Runtime Operations</span>
           <button
             onClick={() => setActiveTab("health")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
@@ -260,17 +296,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 : "hover:bg-slate-800 text-slate-400"
             }`}
           >
-            🏠 Platform Health
-          </button>
-          <button
-            onClick={() => setActiveTab("docs")}
-            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "docs"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-400"
-            }`}
-          >
-            📚 Documentation
+            🏠 Health
           </button>
           <button
             onClick={() => setActiveTab("registry")}
@@ -303,15 +329,64 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             🔄 Runtime Manager
           </button>
           <button
-            onClick={() => setActiveTab("explorer")}
+            onClick={() => setActiveTab("adapters")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "explorer"
+              activeTab === "adapters"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
                 : "hover:bg-slate-800 text-slate-400"
             }`}
           >
-            🕸️ AIR & AKG Explorer
+            🔌 Tool Hub
           </button>
+          <button
+            onClick={() => setActiveTab("nodes")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "nodes"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-400"
+            }`}
+          >
+            🖥️ Node Registry
+          </button>
+
+          {/* Group 2: Federation & KQL */}
+          <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider mt-2">Federation & KQL</span>
+          <button
+            onClick={() => setActiveTab("kql")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "kql"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-400"
+            }`}
+          >
+            🕸️ KQL Console
+          </button>
+          <button
+            onClick={() => setActiveTab("federation")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "federation"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            📡 Federation
+          </button>
+
+          {/* Group 3: Workflow Orchestration */}
+          <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider mt-2">Workflows</span>
+          <button
+            onClick={() => setActiveTab("workflows")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "workflows"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            ⚙️ Workflow Dashboard
+          </button>
+
+          {/* Group 4: Diagnostics */}
+          <span className="text-[9px] text-slate-500 font-bold px-2 py-1 uppercase tracking-wider mt-2">Diagnostics</span>
           <button
             onClick={() => setActiveTab("debugger")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
@@ -333,46 +408,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             ⏳ Trace History
           </button>
           <button
-            onClick={() => setActiveTab("adapters")}
-            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "adapters"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
-            }`}
-          >
-            🔌 Tool Hub
-          </button>
-          <button
-            onClick={() => setActiveTab("kql")}
-            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "kql"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
-            }`}
-          >
-            🕸️ KQL Console
-          </button>
-          <button
-            onClick={() => setActiveTab("nodes")}
-            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "nodes"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
-            }`}
-          >
-            🖥️ Node Registry
-          </button>
-          <button
-            onClick={() => setActiveTab("federation")}
-            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
-              activeTab === "federation"
-                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
-            }`}
-          >
-            📡 Federation
-          </button>
-          <button
             onClick={() => setActiveTab("observability")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "observability"
@@ -390,7 +425,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 : "hover:bg-slate-800 text-slate-400"
             }`}
           >
-            🛡️ Platform Governance
+            🛡️ Governance
           </button>
         </div>
 
@@ -524,7 +559,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             </div>
           )}
 
-          {/* 📂 Package Explorer Dashboard */}
           {activeTab === "packages" && (
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
@@ -586,21 +620,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <span className="text-slate-400">Semantic Nodes:</span>
                     <span className="text-cyan-400 font-mono">14</span>
                   </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Capability Bindings:</span>
-                    <span className="text-cyan-400 font-mono">8</span>
-                  </div>
                 </div>
-
                 <div className="p-4 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
                   <span className="font-bold text-slate-300">Persistent AKG Graph Stats</span>
                   <div className="flex justify-between text-[11px] mt-2">
                     <span className="text-slate-400">Knowledge Nodes (AtlasObjects):</span>
                     <span className="text-emerald-400 font-mono">8440</span>
-                  </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Edges & Relationships:</span>
-                    <span className="text-emerald-400 font-mono">21900</span>
                   </div>
                 </div>
               </div>
@@ -672,27 +697,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   >
                     Continue ▶️
                   </button>
-                </div>
-              </div>
-
-              {/* Event Timeline Sequence */}
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
-                <span className="font-bold text-slate-300">Sequential Event Timeline Stream</span>
-                <div className="flex items-center gap-2 mt-2 font-mono text-[10px]">
-                  {timeline.map((e, index) => (
-                    <div key={index} className="flex items-center gap-1.5">
-                      {index > 0 && <span className="text-slate-600">&rarr;</span>}
-                      <span className={`px-2 py-1 rounded border ${
-                        e.status === "PAUSED"
-                          ? "bg-red-500/20 text-red-300 border-red-500/40 animate-pulse font-bold"
-                          : e.status === "COMPLETED"
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                          : "bg-slate-800 text-slate-500 border-slate-700"
-                      }`}>
-                        {e.name}
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
@@ -1011,6 +1015,108 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ))
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ⚙️ Workflow Dashboard Workspace */}
+          {activeTab === "workflows" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">⚙️ WORKFLOW ORCHESTRATION DASHBOARD</h3>
+                  <p className="text-[10px] text-slate-500">Instantiate templates, manage scoring schedulers, and monitor pipeline progress</p>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <span className="text-[10px] text-slate-400 font-mono">Policy: <strong>{schedulerPolicy}</strong></span>
+                  <button
+                    onClick={handleTogglePolicy}
+                    className="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2 py-0.5 rounded text-[10px] cursor-pointer"
+                  >
+                    Toggle Policy
+                  </button>
+                </div>
+              </div>
+
+              {/* Template Row Mappings */}
+              <div className="grid grid-cols-2 gap-4">
+                {workflowTemplates.map(t => (
+                  <div key={t.workflowId} className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-200">{t.name}</span>
+                      <span className="text-[9px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">v{t.version}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-snug">{t.description}</p>
+                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                      {t.tags.map(tag => (
+                        <span key={tag} className="bg-cyan-950/40 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded text-[9px] font-mono">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => handleInstantiateWorkflow(t.workflowId)}
+                      className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-1 rounded text-[10px] mt-2 cursor-pointer w-full"
+                    >
+                      Instantiate Workflow
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Active Instances Grid */}
+              {workflowInstances.length > 0 && (
+                <div className="flex flex-col gap-3 mt-2 border-t border-slate-850 pt-3">
+                  <span className="font-bold text-slate-350 block">Active Running Workflow Instances</span>
+                  {workflowInstances.map(inst => (
+                    <div key={inst.instanceId} className="p-3.5 bg-slate-900/60 border border-slate-850 rounded flex flex-col gap-2">
+                      <div className="flex justify-between items-center border-b border-slate-850/60 pb-1.5">
+                        <div>
+                          <span className="font-mono font-bold text-cyan-300">{inst.instanceId}</span>
+                          <span className="text-slate-500 text-[10px] ml-2">Definition: {inst.definitionId}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                          inst.state === "Completed"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : inst.state === "Failed"
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-amber-500/20 text-amber-400 animate-pulse"
+                        }`}>
+                          {inst.state.toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* DAG Graph visualization */}
+                      <div className="flex items-center gap-4 mt-2 justify-center py-2 bg-slate-950/40 border border-slate-900 rounded">
+                        {inst.steps.map((step, idx) => (
+                          <div key={step.stepId} className="flex items-center gap-2">
+                            {idx > 0 && <span className="text-slate-700 font-bold font-mono">&rarr;</span>}
+                            <div className={`p-2 rounded border flex flex-col gap-0.5 min-w-[120px] text-center ${
+                              step.state === "Completed"
+                                ? "bg-emerald-950/20 border-emerald-500/40 text-emerald-300"
+                                : step.state === "Running"
+                                ? "bg-amber-950/20 border-amber-500/40 text-amber-300 animate-pulse"
+                                : "bg-slate-900 border-slate-800 text-slate-500"
+                            }`}>
+                              <span className="font-bold text-[10px]">{step.name}</span>
+                              <span className="text-[8px] opacity-60 font-mono">
+                                {step.state} {step.assignedNode ? `(${step.assignedNode})` : ""}
+                              </span>
+                              {step.state === "Ready" && (
+                                <button
+                                  onClick={() => handleRunWorkflowStep(inst.instanceId, step.stepId)}
+                                  className="bg-cyan-500 text-slate-950 text-[9px] font-bold py-0.5 px-1.5 rounded mt-1.5 hover:bg-cyan-400 cursor-pointer"
+                                >
+                                  Execute Step
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
