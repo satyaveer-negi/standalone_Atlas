@@ -3,10 +3,12 @@ import { activePackageRegistry, RegistryPackage } from "../../services/packageRe
 import { activeRuntimeManager } from "../../implementations/runtimeManager";
 import { activePlatformDebugger, DebugEvent, DebugTransaction, BreakpointType } from "../../services/platformDebugger";
 import { activeExecutionTraceStore, ExecutionTrace } from "../../services/tracing/executionTraceStore";
-import { activeContractValidator, Diagnostic } from "../../services/validation/contractValidator";
+import { activeContractValidator } from "../../services/validation/contractValidator";
 import { activeSecurityEngine, SecurityPolicy, SecurityAuditRecord } from "../../services/security/securityEngine";
 import { activePerformanceProfiler, SubsystemMetrics } from "../../services/profiling/performanceProfiler";
 import { activePackageCertification, CertificationReport } from "../../services/certification/packageCertification";
+import { activeKQLQueryEngine, KQLQueryResult, KQLExplainPlan } from "../../services/kql/parser";
+import { activeToolAdapters, ToolAdapter, AdapterState } from "../../services/adapters/externalToolAdapters";
 
 interface ControlCenterProps {
   onClose: () => void;
@@ -16,12 +18,15 @@ type ActiveWorkspace =
   | "health"
   | "docs"
   | "registry"
+  | "packages"
   | "runtime"
   | "explorer"
   | "debugger"
   | "traces"
   | "observability"
-  | "governance";
+  | "governance"
+  | "adapters"
+  | "kql";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("health");
@@ -31,6 +36,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [auditLogs, setAuditLogs] = useState<SecurityAuditRecord[]>([]);
   const [metrics, setMetrics] = useState<SubsystemMetrics>(activePerformanceProfiler.getLiveMetrics());
 
+  // Debugger states
   const [debuggerState, setDebuggerState] = useState(activePlatformDebugger.state);
   const [timeline, setTimeline] = useState<DebugEvent[]>(activePlatformDebugger.timeline);
   const [transactions, setTransactions] = useState<DebugTransaction[]>(activePlatformDebugger.transactions);
@@ -39,14 +45,20 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [mockLogs, setMockLogs] = useState<string[]>([]);
   const [certificationReport, setCertificationReport] = useState<CertificationReport | null>(null);
 
+  // II.0 States
+  const [adapters, setAdapters] = useState<ToolAdapter[]>([]);
+  const [kqlQuery, setKqlQuery] = useState("MATCH Package WHERE certification = Gold RETURN id, version");
+  const [kqlResult, setKqlResult] = useState<KQLQueryResult | null>(null);
+  const [kqlExplain, setKqlExplain] = useState<KQLExplainPlan[] | null>(null);
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
     setPolicies(activeSecurityEngine.getPoliciesList());
     setAuditLogs(activeSecurityEngine.getAuditTrail());
+    setAdapters(activeToolAdapters.getAdaptersList());
 
     const interval = setInterval(() => {
-      // Simulate live performance updates
       const updatedMetrics: SubsystemMetrics = {
         compilerTimeMs: 1040,
         runtimeBootTimeMs: 400,
@@ -91,7 +103,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setMockLogs(prev => [...prev, `[Trace Store] Removed execution trace file: "${id}".`]);
   };
 
-  // Debugger handlers
+  // Debugger Handlers
   const handleTriggerBP = () => {
     activePlatformDebugger.setBreakpoint(bpType, bpTarget);
     activePlatformDebugger.triggerBreakpointHit();
@@ -121,6 +133,28 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setTimeout(() => {
       setDebuggerState("PAUSED");
     }, 600);
+  };
+
+  // II.0 Handlers
+  const handleExecuteKQL = () => {
+    const res = activeKQLQueryEngine.executeKQL(kqlQuery);
+    setKqlResult(res);
+    setKqlExplain(null);
+    setMockLogs(prev => [...prev, `[KQL Query] Executed successfully. Returned ${res.rows.length} rows.`]);
+  };
+
+  const handleExplainKQL = () => {
+    const plans = activeKQLQueryEngine.explainQuery(kqlQuery);
+    setKqlExplain(plans);
+    setKqlResult(null);
+    setMockLogs(prev => [...prev, `[KQL Query] Built AST compilation pipeline trace plan.`]);
+  };
+
+  const handleToggleAdapter = (name: string, state: AdapterState) => {
+    const nextState: AdapterState = state === "Connected" ? "Available" : "Connected";
+    activeToolAdapters.updateAdapterState(name, nextState);
+    setAdapters(activeToolAdapters.getAdaptersList());
+    setMockLogs(prev => [...prev, `[Adapter Manager] Transitioned "${name}": ${state} -> ${nextState}.`]);
   };
 
   return (
@@ -174,6 +208,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             📦 Package Registry
           </button>
           <button
+            onClick={() => setActiveTab("packages")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "packages"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-400"
+            }`}
+          >
+            📂 Package Explorer
+          </button>
+          <button
             onClick={() => setActiveTab("runtime")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "runtime"
@@ -214,6 +258,26 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             ⏳ Trace History
           </button>
           <button
+            onClick={() => setActiveTab("adapters")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "adapters"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            🔌 Tool Hub
+          </button>
+          <button
+            onClick={() => setActiveTab("kql")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "kql"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            🕸️ KQL Console
+          </button>
+          <button
             onClick={() => setActiveTab("observability")}
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "observability"
@@ -236,12 +300,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
         </div>
 
         {/* 💻 Center Workspace Content Viewer */}
-        <div className="flex-1 p-5 overflow-y-auto bg-slate-950 text-xs">
-          {/* 🏠 Platform Health summary */}
+        <div className="flex-1 p-5 overflow-y-auto bg-slate-950 text-xs font-sans">
           {activeTab === "health" && (
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
-                <h3 className="font-bold text-sm text-cyan-300">PLATFORM HEALTH ENGINE SUMMARY</h3>
+                <h3 className="font-bold text-sm text-cyan-300">PLATFORM HEALTH SUMMARY</h3>
                 <p className="text-[10px] text-slate-500">Live operational compliance diagnostics for UKOP v1.2</p>
               </div>
               <div className="grid grid-cols-3 gap-4">
@@ -274,7 +337,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">BOOKS & SPECIFICATION VOLUMES INDEX</h3>
-                <p className="text-[10px] text-slate-500">Official developer reference library for UKOP 2.0</p>
+                <p className="text-[10px] text-slate-500">Official reference documentation for UKOP 2.0</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
@@ -284,14 +347,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
                   <span className="font-bold text-slate-300">Volume II: Contract Specification</span>
                   <p className="text-[10px] text-slate-400 mt-1">Freezes AIR Graph nodes, events schemas, and DI service definitions.</p>
-                </div>
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="font-bold text-slate-300">Volume III: Package (.atlaskp) System</span>
-                  <p className="text-[10px] text-slate-400 mt-1">Rules for catalog mappings, signatures, and scaffolding validators.</p>
-                </div>
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="font-bold text-slate-300">Volume VI: CLI & SDK Manual</span>
-                  <p className="text-[10px] text-slate-400 mt-1">Scaffold commands (`atlas create`, `atlas test`, `atlas doctor`).</p>
                 </div>
               </div>
             </div>
@@ -306,7 +361,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 </div>
                 <button
                   onClick={() => handleAction("astronomy", "Available")}
-                  className="bg-cyan-500 text-slate-950 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors"
+                  className="bg-cyan-500 text-slate-950 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
                 >
                   Scaffold Astronomy
                 </button>
@@ -342,13 +397,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <td className="py-2.5 text-right flex gap-1.5 justify-end">
                         <button
                           onClick={() => handleCertify(pkg.id)}
-                          className="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded text-[10px]"
+                          className="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded text-[10px] cursor-pointer"
                         >
                           Certify
                         </button>
                         <button
                           onClick={() => handleAction(pkg.id, pkg.status)}
-                          className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700"
+                          className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
                         >
                           Toggle Status
                         </button>
@@ -371,6 +426,28 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </ul>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 📂 Package Explorer Dashboard */}
+          {activeTab === "packages" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">📂 PACKAGE EXPLORER</h3>
+                <p className="text-[10px] text-slate-500">Inspect schemas, ontology entities, and fields specifications</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {packages.map(p => (
+                  <div key={p.id} className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-200">{p.title}</span>
+                    <p className="text-[10px] text-slate-400">{p.description}</p>
+                    <div className="flex justify-between items-center text-[10px] text-slate-500 mt-2 border-t border-slate-800/60 pt-2">
+                      <span>License: <strong>{p.license}</strong></span>
+                      <span>Author: <strong>{p.author}</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -397,14 +474,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <span className="text-slate-600 font-mono">0 KB</span>
                   </div>
                 </div>
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">Core Dependencies</span>
-                  <p className="font-bold text-slate-300 mt-1">eventBus, security</p>
-                  <div className="flex justify-between items-center mt-3 text-[10px]">
-                    <span className="text-emerald-400">RESOLVED</span>
-                    <span className="text-slate-500">Topological Sorted</span>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -426,10 +495,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <span className="text-slate-400">Capability Bindings:</span>
                     <span className="text-cyan-400 font-mono">8</span>
                   </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Workflow States:</span>
-                    <span className="text-cyan-400 font-mono">6</span>
-                  </div>
                 </div>
 
                 <div className="p-4 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
@@ -441,10 +506,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <div className="flex justify-between text-[11px]">
                     <span className="text-slate-400">Edges & Relationships:</span>
                     <span className="text-emerald-400 font-mono">21900</span>
-                  </div>
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Active Transactions:</span>
-                    <span className="text-emerald-400 font-mono">14</span>
                   </div>
                 </div>
               </div>
@@ -470,7 +531,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </select>
                   <button
                     onClick={handleTriggerBP}
-                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-2 py-0.5 rounded text-[10px]"
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-2 py-0.5 rounded text-[10px] cursor-pointer"
                   >
                     Trigger Breakpoint
                   </button>
@@ -491,28 +552,28 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <button
                     onClick={() => handleStep("Event")}
                     disabled={debuggerState !== "PAUSED"}
-                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
                   >
                     Step Event
                   </button>
                   <button
                     onClick={() => handleStep("Runtime")}
                     disabled={debuggerState !== "PAUSED"}
-                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
                   >
                     Step Runtime
                   </button>
                   <button
                     onClick={() => handleStep("Commit")}
                     disabled={debuggerState !== "PAUSED"}
-                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700"
+                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 px-2 py-1 rounded text-purple-300 font-mono text-[10px] border border-slate-700 cursor-pointer"
                   >
                     Step Commit
                   </button>
                   <button
                     onClick={handleResume}
                     disabled={debuggerState !== "PAUSED"}
-                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-1 rounded text-[10px] font-bold"
+                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
                   >
                     Continue ▶️
                   </button>
@@ -539,48 +600,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ))}
                 </div>
               </div>
-
-              {/* Provenance & Transactions logs side by side */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
-                  <span className="font-bold text-slate-300">Transaction History Log</span>
-                  <div className="flex flex-col gap-1.5 text-[10px] font-mono mt-1">
-                    {transactions.map(t => (
-                      <div key={t.id} className="border-b border-slate-800/60 pb-1.5">
-                        <div className="flex justify-between font-bold text-purple-300">
-                          <span>Tx #{t.id} [{t.packageName}]</span>
-                          <span>{t.timestamp}</span>
-                        </div>
-                        <ul className="list-disc pl-4 text-slate-400 mt-1 text-[9px] leading-tight">
-                          {t.mutations.map((m, idx) => <li key={idx}>{m}</li>)}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
-                  <span className="font-bold text-slate-300">Auditable Provenance Metadata</span>
-                  <div className="flex flex-col gap-2 text-[10px] mt-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Triggering Event SHA:</span>
-                      <span className="font-mono text-slate-200">sha256-f8319e09</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Causation Parent Event:</span>
-                      <span className="font-mono text-slate-200">parent-event-382</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Creator Component:</span>
-                      <span className="font-mono text-slate-200">knowledgeRuntime</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Validated Signatures:</span>
-                      <span className="text-emerald-400 font-bold">YES (PLATINUM CERTIFIED)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -597,7 +616,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <th className="py-2">Package</th>
                     <th className="py-2">Duration</th>
                     <th className="py-2">Events Count</th>
-                    <th className="py-2">Created</th>
                     <th className="py-2 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -608,20 +626,19 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <td className="py-2.5 text-slate-400">{trace.packageName}</td>
                       <td className="py-2.5 text-slate-400 font-mono">{trace.durationMs} ms</td>
                       <td className="py-2.5 text-slate-400 font-mono">{trace.eventsCount}</td>
-                      <td className="py-2.5 text-slate-500">{trace.createdAt}</td>
                       <td className="py-2.5 text-right flex gap-1.5 justify-end">
                         <button
                           onClick={() => {
                             setActiveTab("debugger");
                             handleTriggerBP();
                           }}
-                          className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded text-[10px]"
+                          className="bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded text-[10px] cursor-pointer"
                         >
                           Replay
                         </button>
                         <button
                           onClick={() => handleDeleteTrace(trace.id)}
-                          className="bg-slate-800 hover:bg-slate-700 px-2.5 py-0.5 rounded text-red-400 text-[10px] font-mono border border-slate-700"
+                          className="bg-slate-800 hover:bg-slate-700 px-2.5 py-0.5 rounded text-red-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
                         >
                           Delete
                         </button>
@@ -630,6 +647,129 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* 🔌 Tool Hub Workspace */}
+          {activeTab === "adapters" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">🔌 EXTERNAL TOOL ADAPTERS HUB</h3>
+                <p className="text-[10px] text-slate-500">Monitor and toggle external simulation, text, and docker integrations</p>
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400">
+                    <th className="py-2">Tool Adapter</th>
+                    <th className="py-2">State</th>
+                    <th className="py-2">Last Handshake</th>
+                    <th className="py-2">Capabilities</th>
+                    <th className="py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adapters.map((a) => (
+                    <tr key={a.name} className="border-b border-slate-900 hover:bg-slate-900/40">
+                      <td className="py-2.5 font-bold text-slate-200">
+                        {a.name} <span className="text-[9px] text-slate-500 font-mono">v{a.version}</span>
+                      </td>
+                      <td className="py-2.5 font-mono text-[10px]">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          a.state === "Connected"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : a.state === "Connecting"
+                            ? "bg-amber-500/20 text-amber-400 animate-pulse"
+                            : "bg-slate-800 text-slate-500"
+                        }`}>
+                          {a.state}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-slate-400">{a.lastSync}</td>
+                      <td className="py-2.5 text-slate-500 font-mono text-[10px]">
+                        {a.capabilities.join(", ")}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <button
+                          onClick={() => handleToggleAdapter(a.name, a.state)}
+                          className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
+                        >
+                          {a.state === "Connected" ? "[Disconnect]" : "[Connect]"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 🕸️ KQL Console Workspace */}
+          {activeTab === "kql" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 mb-2">
+                <h3 className="font-bold text-sm text-cyan-300">🕸️ KNOWLEDGE QUERY LANGUAGE (KQL) CONSOLE</h3>
+                <p className="text-[10px] text-slate-500">Run graph query matches and inspect tokenization pipeline compilation plans</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={kqlQuery}
+                  onChange={(e) => setKqlQuery(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded p-2.5 font-mono text-cyan-300 text-[11px] focus:outline-none focus:ring-1 focus:ring-cyan-500/50 w-full h-[50px] resize-none"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={handleExplainKQL}
+                    className="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
+                  >
+                    EXPLAIN
+                  </button>
+                  <button
+                    onClick={handleExecuteKQL}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  >
+                    EXECUTE QUERY
+                  </button>
+                </div>
+              </div>
+
+              {kqlResult && (
+                <div className="border border-slate-800 rounded bg-slate-900/60 p-3 mt-2">
+                  <span className="font-bold text-slate-300 block mb-2">QueryResult Set</span>
+                  {kqlResult.diagnostics ? (
+                    <span className="text-red-400 font-mono text-[10px]">{kqlResult.diagnostics}</span>
+                  ) : (
+                    <table className="w-full text-left border-collapse text-[10px] font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-500">
+                          {kqlResult.headers.map(h => <th key={h} className="pb-1">{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kqlResult.rows.map((row, index) => (
+                          <tr key={index} className="border-b border-slate-900/40">
+                            {kqlResult.headers.map(h => <td key={h} className="py-1">{row[h]}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {kqlExplain && (
+                <div className="border border-purple-500/30 rounded bg-slate-900/60 p-3 mt-2">
+                  <span className="font-bold text-purple-300 block mb-2">KQL Compiler Explain Pipeline Map</span>
+                  <div className="flex flex-col gap-2 font-mono text-[9px]">
+                    {kqlExplain.map((e, index) => (
+                      <div key={index} className="flex justify-between border-b border-slate-850 pb-1">
+                        <span className="text-slate-400">{e.stage}:</span>
+                        <span className="text-purple-300">{e.description} <strong className="text-slate-500">({e.durationMs}ms)</strong></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
