@@ -1,5 +1,6 @@
 import { activeAgentRuntime, AgentState, AgentLog } from "../agents/runtime/agentRuntime";
 import { LearningRecord } from "../agents/learning/learningManager";
+import "../agents/plugins/cfd/cfdDomainAgent"; // Trigger static registration
 
 export type { AgentState, AgentLog, LearningRecord };
 

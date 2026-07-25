@@ -53,6 +53,8 @@ import { activeFederatedGraphCoordinator } from "../../services/workflow/workflo
 import type { FederationRegistryEntry } from "../../services/workflow/workflowFederatedGraph";
 import { activeAutonomousAgentEngine } from "../../services/workflow/workflowAutonomousAgent";
 import type { AgentState, AgentLog, LearningRecord } from "../../services/workflow/workflowAutonomousAgent";
+import { activeDomainAgentRegistry } from "../../services/agents/registry/domainAgentRegistry";
+import type { DomainAgentDescriptor } from "../../services/agents/registry/domainAgentRegistry";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -155,11 +157,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   // III.7 States
   const [federatedRegistries, setFederatedRegistries] = useState<FederationRegistryEntry[]>([]);
 
-  // III.8 States
+  // III.8 & IV-A States
   const [agentTaskPrompt, setAgentTaskPrompt] = useState("Optimize CFD Grid parameters");
   const [agentState, setAgentState] = useState<AgentState>("Idle");
   const [agentLogs, setAgentLogs] = useState<AgentLog[]>([]);
   const [agentLearnings, setAgentLearnings] = useState<LearningRecord[]>([]);
+  const [domainAgents, setDomainAgents] = useState<DomainAgentDescriptor[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -180,6 +183,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setAgentState(activeAutonomousAgentEngine.getState());
     setAgentLogs(activeAutonomousAgentEngine.getLogs());
     setAgentLearnings(activeAutonomousAgentEngine.getLearningRecords());
+    setDomainAgents(activeDomainAgentRegistry.getAgentsList());
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
@@ -558,7 +562,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "runtime"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-850 text-slate-450"
+                : "hover:bg-slate-855 text-slate-450"
             }`}
           >
             🔄 Runtime Manager
@@ -705,12 +709,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
         </div>
 
         {/* 💻 Center Workspace Content Viewer */}
-        <div className="flex-1 p-5 overflow-y-auto bg-slate-950 text-xs font-sans">
+        <div className="flex-1 p-5 overflow-y-auto bg-slate-955 text-xs font-sans">
           {activeTab === "health" && (
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">PLATFORM HEALTH SUMMARY</h3>
-                <p className="text-[10px] text-slate-500">Live operational compliance diagnostics for UKOP v1.2</p>
+                <p className="text-[10px] text-slate-505">Live operational compliance diagnostics for UKOP v1.2</p>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
@@ -740,7 +744,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
           {activeTab === "docs" && (
             <div className="flex flex-col gap-4">
-              <div className="border-b border-slate-800 pb-2 mb-2">
+              <div className="border-b border-slate-805 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">BOOKS & SPECIFICATION VOLUMES INDEX</h3>
                 <p className="text-[10px] text-slate-555">Official reference documentation for UKOP 2.0</p>
               </div>
@@ -766,7 +770,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 </div>
                 <button
                   onClick={() => handleAction("astronomy", "Available")}
-                  className="bg-cyan-505 text-slate-955 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
+                  className="bg-cyan-505 text-slate-950 font-bold px-2.5 py-1 rounded hover:bg-cyan-400 transition-colors cursor-pointer"
                 >
                   Scaffold Astronomy
                 </button>
@@ -795,14 +799,14 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       </td>
                       <td className="py-2.5">
                         <span className={`h-1.5 w-1.5 rounded-full inline-block mr-2 ${
-                          pkg.status === "Active" ? "bg-emerald-400" : "bg-yellow-400"
+                          pkg.status === "Active" ? "bg-emerald-400" : "bg-yellow-405"
                         }`}></span>
                         {pkg.status}
                       </td>
                       <td className="py-2.5 text-right flex gap-1.5 justify-end">
                         <button
                           onClick={() => handleCertify(pkg.id)}
-                          className="bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded text-[10px] cursor-pointer"
+                          className="bg-purple-600 hover:bg-purple-550 text-white px-2 py-1 rounded text-[10px] cursor-pointer"
                         >
                           Certify
                         </button>
@@ -857,7 +861,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
           {activeTab === "runtime" && (
             <div className="flex flex-col gap-4">
-              <div className="border-b border-slate-805 pb-2 mb-2">
+              <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">RUNTIME LIFECYCLE CONTROLLER</h3>
                 <p className="text-[10px] text-slate-550">Component loads orders and dependencies verification</p>
               </div>
@@ -867,7 +871,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <span className="text-[10px] text-slate-500 uppercase font-bold">Loaded Component</span>
                     <p className="font-bold text-slate-200 mt-1">knowledgeRuntime</p>
                   </div>
-                  <span className="text-emerald-400 font-bold text-[10px]">ACTIVE</span>
+                  <span className="text-emerald-455 font-bold text-[10px]">ACTIVE</span>
                 </div>
               </div>
             </div>
@@ -883,14 +887,14 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="p-4 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
                   <span className="font-bold text-slate-300">Transient AIR Node Distribution</span>
                   <div className="flex justify-between text-[11px] mt-2">
-                    <span className="text-slate-400">Semantic Nodes:</span>
+                    <span className="text-slate-405">Semantic Nodes:</span>
                     <span className="text-cyan-400 font-mono">14</span>
                   </div>
                 </div>
                 <div className="p-4 bg-slate-900 border border-slate-800 rounded flex flex-col gap-2">
                   <span className="font-bold text-slate-300">Persistent AKG Graph Stats</span>
                   <div className="flex justify-between text-[11px] mt-2">
-                    <span className="text-slate-400">Knowledge Nodes (AtlasObjects):</span>
+                    <span className="text-slate-405">Knowledge Nodes (AtlasObjects):</span>
                     <span className="text-emerald-400 font-mono">8440</span>
                   </div>
                 </div>
@@ -959,7 +963,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <button
                     onClick={handleResume}
                     disabled={debuggerState !== "PAUSED"}
-                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
+                    className="bg-emerald-600 hover:bg-emerald-555 disabled:opacity-40 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
                   >
                     Continue ▶️
                   </button>
@@ -1003,7 +1007,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         </button>
                         <button
                           onClick={() => handleDeleteTrace(trace.id)}
-                          className="bg-slate-800 hover:bg-slate-700 px-2.5 py-0.5 rounded text-red-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
+                          className="bg-slate-805 hover:bg-slate-700 px-2.5 py-0.5 rounded text-red-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
                         >
                           Delete
                         </button>
@@ -1044,7 +1048,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                             ? "bg-emerald-500/20 text-emerald-400"
                             : a.state === "Connecting"
                             ? "bg-amber-500/20 text-amber-400 animate-pulse"
-                            : "bg-slate-800 text-slate-550"
+                            : "bg-slate-805 text-slate-550"
                         }`}>
                           {a.state}
                         </span>
@@ -1057,14 +1061,14 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         {a.state === "Connected" && (
                           <button
                             onClick={() => handleExecuteAdapter(a.name)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
+                            className="bg-emerald-600 hover:bg-emerald-555 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
                           >
                             Execute
                           </button>
                         )}
                         <button
                           onClick={() => handleToggleAdapter(a.name, a.state)}
-                          className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
+                          className="bg-slate-805 hover:bg-slate-700 px-2 py-1 rounded text-cyan-400 text-[10px] font-mono border border-slate-700 cursor-pointer"
                         >
                           {a.state === "Connected" ? "[Disconnect]" : "[Connect]"}
                         </button>
@@ -1098,7 +1102,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               )}
 
               {jobsQueue.length > 0 && (
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded mt-3 text-[10px] flex flex-col gap-1.5">
+                <div className="p-3 bg-slate-900 border border-slate-805 rounded mt-3 text-[10px] flex flex-col gap-1.5">
                   <span className="font-bold text-slate-400 block border-b border-slate-850 pb-1">Orchestrated Execution Jobs Queue</span>
                   {jobsQueue.map(job => (
                     <div key={job.jobId} className="flex justify-between items-center py-1 border-b border-slate-900/60 last:border-0">
@@ -1109,9 +1113,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold ${
                           job.status === "COMPLETED"
-                            ? "bg-emerald-500/20 text-emerald-405"
+                            ? "bg-emerald-500/20 text-emerald-400"
                             : job.status === "FAILED"
-                            ? "bg-red-500/20 text-red-400"
+                            ? "bg-red-500/20 text-red-405"
                             : job.status === "CANCELLED"
                             ? "bg-slate-800 text-slate-500"
                             : "bg-amber-500/20 text-amber-400 animate-pulse"
@@ -1121,7 +1125,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         {(job.status === "RUNNING" || job.status === "QUEUED") && (
                           <button
                             onClick={() => handleCancelJob(job.jobId)}
-                            className="bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 px-1.5 py-0.5 rounded text-[8px] cursor-pointer"
+                            className="bg-slate-800 hover:bg-slate-700 text-red-405 border border-slate-700 px-1.5 py-0.5 rounded text-[8px] cursor-pointer"
                           >
                             Cancel
                           </button>
@@ -1151,13 +1155,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                  <div className="flex gap-2 justify-end">
                   <button
                     onClick={handleValidateKQL}
-                    className="bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
+                    className="bg-slate-805 hover:bg-slate-700 text-purple-300 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
                   >
                     VALIDATE
                   </button>
                   <button
                     onClick={handleExplainKQL}
-                    className="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
+                    className="bg-slate-805 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-3 py-1 rounded text-[10px] font-mono cursor-pointer"
                   >
                     EXPLAIN
                   </button>
@@ -1227,7 +1231,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               </div>
               <table className="w-full text-left border-collapse text-[10px]">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-500 font-bold">
+                  <tr className="border-b border-slate-800 text-slate-505 font-bold">
                     <th className="py-1">Node ID</th>
                     <th className="py-1">Endpoint</th>
                     <th className="py-1">Latency</th>
@@ -1283,8 +1287,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <td className="py-2 font-bold text-slate-200">{org.organizationId}</td>
                       <td className="py-2 text-slate-400">{org.endpoint}</td>
                       <td className="py-2 text-center text-cyan-400">{org.latency} ms</td>
-                      <td className="py-2 text-center text-emerald-405">{org.availability}%</td>
-                      <td className="py-2 text-center font-bold text-purple-305">{org.trustLevel * 100}%</td>
+                      <td className="py-2 text-center text-emerald-450">{org.availability}%</td>
+                      <td className="py-2 text-center font-bold text-purple-300">{org.trustLevel * 100}%</td>
                       <td className="py-2 text-right text-slate-400">{org.supportedDomains.join(", ")}</td>
                     </tr>
                   ))}
@@ -1319,7 +1323,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   placeholder="Search packages..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[10.5px] font-mono text-cyan-300 focus:outline-none w-1/3"
+                  className="bg-slate-900 border border-slate-805 rounded px-2.5 py-1 text-[10.5px] font-mono text-cyan-300 focus:outline-none w-1/3"
                 />
                 <select
                   value={searchDomain}
@@ -1372,11 +1376,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       placeholder='{"packageId": "custom-pkg", ...}'
                       value={importJson}
                       onChange={(e) => setImportJson(e.target.value)}
-                      className="bg-slate-900 border border-slate-800 rounded p-1.5 font-mono text-[9px] text-cyan-300 focus:outline-none w-full h-[50px] resize-none"
+                      className="bg-slate-900 border border-slate-850 rounded p-1.5 font-mono text-[9px] text-cyan-300 focus:outline-none w-full h-[50px] resize-none"
                     />
                     <button
                       onClick={handleImportWorkflowPackage}
-                      className="bg-purple-650 hover:bg-purple-500 text-white font-bold py-1 rounded text-[9.5px] cursor-pointer"
+                      className="bg-purple-650 hover:bg-purple-550 text-white font-bold py-1 rounded text-[9.5px] cursor-pointer"
                     >
                       Validate & Import Package
                     </button>
@@ -1387,7 +1391,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="flex flex-col gap-2.5 border-r border-slate-800/60 pr-4">
                   <span className="font-bold text-slate-400 text-[10.5px]">B. Governance & Review Portal</span>
                   {selectedPackage ? (
-                    <div className="p-3 bg-slate-900 border border-slate-855 rounded flex flex-col gap-2 text-[9.5px]">
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2 text-[9.5px]">
                       <div className="flex justify-between items-center">
                         <span>Status: <strong>{pkgApprovalState}</strong></span>
                         <select
@@ -1406,21 +1410,21 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         <button
                           onClick={() => handleGovernanceAction("Submit")}
                           disabled={pkgApprovalState !== "Draft"}
-                          className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-cyan-300 px-2 py-0.5 rounded text-[8.5px] border border-slate-700 cursor-pointer"
+                          className="bg-slate-805 hover:bg-slate-700 disabled:opacity-40 text-cyan-300 px-2 py-0.5 rounded text-[8.5px] border border-slate-700 cursor-pointer"
                         >
                           Submit For Review
                         </button>
                         <button
                           onClick={() => handleGovernanceAction("Approve")}
                           disabled={pkgApprovalState !== "InReview"}
-                          className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
+                          className="bg-emerald-600 hover:bg-emerald-555 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => handleGovernanceAction("Reject")}
                           disabled={pkgApprovalState !== "InReview"}
-                          className="bg-red-650 hover:bg-red-500 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
+                          className="bg-red-650 hover:bg-red-555 disabled:opacity-40 text-white px-2 py-0.5 rounded text-[8.5px] cursor-pointer"
                         >
                           Reject
                         </button>
@@ -1464,11 +1468,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                             placeholder="Add comment..."
                             value={newComment}
                             onChange={(e) => setNewComment(e.target.value)}
-                            className="bg-slate-955 border border-slate-800 rounded px-2 py-0.5 text-[9px] text-slate-350 focus:outline-none flex-1"
+                            className="bg-slate-955 border border-slate-805 rounded px-2 py-0.5 text-[9px] text-slate-350 focus:outline-none flex-1"
                           />
                           <button
                             onClick={handleAddComment}
-                            className="bg-slate-800 hover:bg-slate-700 text-cyan-300 px-2 py-0.5 rounded text-[9px] border border-slate-700 cursor-pointer"
+                            className="bg-slate-805 hover:bg-slate-700 text-cyan-300 px-2 py-0.5 rounded text-[9px] border border-slate-700 cursor-pointer"
                           >
                             Post
                           </button>
@@ -1489,7 +1493,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <div className="p-2.5 bg-slate-900 border border-slate-800 rounded flex flex-col gap-1 text-[9px]">
                         <div className="flex justify-between border-b border-slate-850 pb-1 font-bold">
                           <span>Report: {validationReport.packageId}</span>
-                          <span className={validationReport.overallPassed ? "text-emerald-400" : "text-red-400"}>
+                          <span className={validationReport.overallPassed ? "text-emerald-400" : "text-red-405"}>
                             {validationReport.overallPassed ? "PASSED" : "FAILED"}
                           </span>
                         </div>
@@ -1497,7 +1501,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                           {validationReport.stages.map(st => (
                             <div key={st.stage} className="flex justify-between">
                               <span className="text-slate-400">{st.stage}:</span>
-                              <span className={st.status === "PASSED" ? "text-emerald-400" : "text-red-400"}>{st.status}</span>
+                              <span className={st.status === "PASSED" ? "text-emerald-400" : "text-red-405"}>{st.status}</span>
                             </div>
                           ))}
                         </div>
@@ -1517,7 +1521,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         packageAuditHistory.map(log => (
                           <div key={log.recordId} className="border-b border-slate-850 pb-1 last:border-0">
                             <div className="flex justify-between text-[8px]">
-                              <span className={log.status === "SUCCESS" ? "text-emerald-405 font-bold" : "text-red-400 font-bold"}>
+                              <span className={log.status === "SUCCESS" ? "text-emerald-450 font-bold" : "text-red-405 font-bold"}>
                                 {log.action} ({log.status})
                               </span>
                               <span className="text-slate-505">{log.timestamp}</span>
@@ -1547,7 +1551,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     placeholder="Filter Correlation ID"
                     value={filterCorrelationId}
                     onChange={(e) => setFilterCorrelationId(e.target.value)}
-                    className="bg-slate-900 border border-slate-800 rounded px-2.5 py-0.5 font-mono text-cyan-300 text-[10px] focus:outline-none"
+                    className="bg-slate-900 border border-slate-805 rounded px-2.5 py-0.5 font-mono text-cyan-300 text-[10px] focus:outline-none"
                   />
                 </div>
               </div>
@@ -1610,7 +1614,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <div className="flex gap-2 justify-center py-2 border-t border-b border-slate-850/60">
                         <button
                           onClick={handleStepReplay}
-                          className="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-2 py-0.5 rounded text-[9px] cursor-pointer"
+                          className="bg-slate-850 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-2 py-0.5 rounded text-[9px] cursor-pointer"
                         >
                           ⏭ Step Forward
                         </button>
@@ -1644,14 +1648,14 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
           {/* 🛒 Marketplace Workspace */}
           {activeTab === "marketplace" && (
             <div className="flex flex-col gap-4">
-              <div className="border-b border-slate-800 pb-2 mb-2">
+              <div className="border-b border-slate-805 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">🛒 DISTRIBUTED WORKFLOW MARKETPLACE</h3>
                 <p className="text-[10px] text-slate-500">Discover, trust-verify, and install certified engineering workflow packages</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 {/* Panel 1: Available Packages */}
-                <div className="flex flex-col gap-2 border-r border-slate-805/60 pr-4">
+                <div className="flex flex-col gap-2 border-r border-slate-800/60 pr-4">
                   <span className="font-bold text-slate-400 text-[10.5px]">1. Available Marketplace Packages</span>
                   {marketplaceCatalog.map(item => (
                     <div
@@ -1697,13 +1701,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <div className="flex flex-col gap-3">
                   <span className="font-bold text-slate-400 text-[10.5px]">3. Installer Pipeline Actions</span>
                   {selectedMarketplacePackage ? (
-                    <div className="p-3 bg-slate-900 border border-slate-855 rounded flex flex-col gap-2">
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded flex flex-col gap-2">
                       <p className="text-[9px] text-slate-505 leading-snug">
                         The package installer runs signature checksum matches and capability validations before publishing to your local repository.
                       </p>
                       <button
                         onClick={() => handleInstallMarketplacePackage(selectedMarketplacePackage)}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-1.5 rounded text-[10px] cursor-pointer"
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold py-1.5 rounded text-[10px] cursor-pointer"
                       >
                         Run Package Installation
                       </button>
@@ -1722,7 +1726,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               <div className="border-b border-slate-800 pb-2 mb-2 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-cyan-300">🧠 AI WORKFLOW INTELLIGENCE</h3>
-                  <p className="text-[10px] text-slate-500">Formulate engineering workflows, calculate change risk scoring, and map peer reviewers</p>
+                  <p className="text-[10px] text-slate-550">Formulate engineering workflows, calculate change risk scoring, and map peer reviewers</p>
                 </div>
               </div>
 
@@ -1735,7 +1739,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 />
                 <button
                   onClick={handleTriggerAICopilot}
-                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-955 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
                 >
                   Ask AI Agent
                 </button>
@@ -1774,7 +1778,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     </div>
                     <button
                       onClick={handleInstallAIPackage}
-                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1 rounded text-[9.5px] mt-2 cursor-pointer w-full"
+                      className="bg-purple-600 hover:bg-purple-550 text-white font-bold py-1 rounded text-[9.5px] mt-2 cursor-pointer w-full"
                     >
                       Install Package
                     </button>
@@ -1786,7 +1790,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <span className="font-bold text-slate-350 block text-[10.5px]">Risk Assessment Report</span>
                       <div className="flex justify-between border-b border-slate-855 pb-1 font-bold">
                         <span>Overall Risk Score:</span>
-                        <span className={aiRiskAssessment.overallScore > 30 ? "text-amber-400" : "text-emerald-400"}>
+                        <span className={aiRiskAssessment.overallScore > 30 ? "text-amber-400" : "text-emerald-405"}>
                           {aiRiskAssessment.overallScore}%
                         </span>
                       </div>
@@ -1806,7 +1810,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         <span>Confidence Score:</span>
                         <span className="text-cyan-400">{aiRiskAssessment.confidence}%</span>
                       </div>
-                      <p className="text-slate-505 leading-snug mt-1">{aiRiskAssessment.explanation}</p>
+                      <p className="text-slate-500 leading-snug mt-1">{aiRiskAssessment.explanation}</p>
                     </div>
                   )}
 
@@ -1846,9 +1850,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <p className="text-[10px] text-slate-500">Launch background planning agent execution loops and monitor outcomes enrichment</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400">Agent State:</span>
+                  <span className="text-[10px] text-slate-405">Agent State:</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    agentState === "Idle" ? "bg-slate-800 text-slate-500" : "bg-cyan-500/20 text-cyan-400 animate-pulse"
+                    agentState === "Idle" ? "bg-slate-800 text-slate-505" : "bg-cyan-505/20 text-cyan-400 animate-pulse"
                   }`}>
                     {agentState}
                   </span>
@@ -1865,10 +1869,37 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <button
                   onClick={handleTriggerAutonomousAgent}
                   disabled={agentState !== "Idle"}
-                  className="bg-cyan-505 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
+                  className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold px-3 py-1 rounded text-[10px] cursor-pointer"
                 >
                   Trigger Run Loop
                 </button>
+              </div>
+
+              {/* IV-A Domain Registry Visualization Section */}
+              <div className="p-3 bg-slate-900/60 border border-slate-805 rounded flex flex-col gap-1.5">
+                <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1.5 text-[10.5px]">Domain Intelligence Registry plugins</span>
+                <table className="w-full text-left border-collapse text-[9px] font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-850 text-slate-500">
+                      <th>Agent Plugin ID</th>
+                      <th>Expert Domains</th>
+                      <th>Capabilities</th>
+                      <th className="text-center">Success Rate</th>
+                      <th className="text-right">Version</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {domainAgents.map(agent => (
+                      <tr key={agent.id} className="border-b border-slate-900/60 hover:bg-slate-900/10">
+                        <td className="py-1 font-bold text-cyan-400">{agent.name}</td>
+                        <td className="py-1 text-slate-300">{agent.domains.join(", ")}</td>
+                        <td className="py-1 text-slate-450">{agent.capabilities.join(", ")}</td>
+                        <td className="py-1 text-center font-bold text-purple-305">{agent.successRate}%</td>
+                        <td className="py-1 text-right text-slate-505">{agent.version}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1898,7 +1929,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     ) : (
                       agentLearnings.map((learn, idx) => (
                         <div key={idx} className="border-b border-slate-900 pb-1.5 last:border-0">
-                          <div className="flex justify-between font-bold text-purple-300">
+                          <div className="flex justify-between font-bold text-purple-305">
                             <span>Node ID: {learn.nodeId}</span>
                             <span className="text-emerald-400">Score: {learn.metricScore}%</span>
                           </div>
@@ -1920,19 +1951,19 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               </div>
               <div className="grid grid-cols-4 gap-4 text-center font-mono">
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Event Depth</span>
+                  <span className="text-[9px] text-slate-500 block font-bold">Event Depth</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.eventBusQueueDepth} items</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">AKG Query Latency</span>
+                  <span className="text-[9px] text-slate-500 block font-bold">AKG Query Latency</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.akgQueryLatencyMs} ms</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Core Memory Space</span>
+                  <span className="text-[9px] text-slate-500 block font-bold">Core Memory Space</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{metrics.memoryUsageMb} MB</span>
                 </div>
                 <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[9px] text-slate-500 uppercase block font-bold">Render Latency</span>
+                  <span className="text-[9px] text-slate-500 block font-bold">Render Latency</span>
                   <span className="text-sm font-bold text-cyan-300 mt-1 block">{Math.floor(1000 / metrics.renderFps)} ms</span>
                 </div>
               </div>
@@ -1943,7 +1974,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 mb-2">
                 <h3 className="font-bold text-sm text-cyan-300">PLATFORM GOVERNANCE & COMPLIANCE</h3>
-                <p className="text-[10px] text-slate-500">Policy enforcement registry audit violations checklist</p>
+                <p className="text-[10px] text-slate-550">Policy enforcement registry audit violations checklist</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1988,10 +2019,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
 
         {/* 📜 Right Command Inspector Logs Console */}
         <div className="w-72 bg-slate-900 border-l border-slate-800 flex flex-col p-4 overflow-hidden">
-          <span className="font-bold text-[10px] text-slate-400 uppercase border-b border-slate-800 pb-1.5 mb-2">
+          <span className="font-bold text-[10px] text-slate-405 uppercase border-b border-slate-800 pb-1.5 mb-2">
             📟 OPERATIONAL LOGS STREAM
           </span>
-          <div className="flex-1 overflow-y-auto font-mono text-[9px] text-cyan-400 flex flex-col gap-1.5 pr-2">
+          <div className="flex-1 overflow-y-auto font-mono text-[9px] text-cyan-405 flex flex-col gap-1.5 pr-2">
             <div className="opacity-60">[09:30:11] Kernel event fabric initialized.</div>
             <div className="opacity-60">[09:30:12] Service container dependencies injected.</div>
             <div className="opacity-60">[09:30:14] Runtime Manager booted topology.</div>
