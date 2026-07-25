@@ -1,4 +1,4 @@
-import { PlatformContext } from "../common/platformContext";
+import type { PlatformContext } from "../common/platformContext";
 
 export type WorkflowEventType =
   | "WorkflowCreated"

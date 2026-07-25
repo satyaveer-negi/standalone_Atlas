@@ -33,6 +33,10 @@ import { activeWorkflowEventBus } from "../../services/workflow/workflowEvents";
 import type { WorkflowEvent } from "../../services/workflow/workflowEvents";
 import { activeWorkflowEventStore } from "../../services/workflow/workflowEventStore";
 import { activeReplayEngine } from "../../services/workflow/replayEngine";
+import { activeWorkflowRepository } from "../../services/workflow/workflowRepository";
+import type { WorkflowPackage, PackageStatus } from "../../services/workflow/workflowRepository";
+import { activeWorkflowValidator } from "../../services/workflow/workflowValidator";
+import type { PackageValidationReport, ValidationStageResult } from "../../services/workflow/workflowValidator";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -87,7 +91,6 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
 
   // III.0 & III.1 States
-  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowDefinition[]>([]);
   const [workflowInstances, setWorkflowInstances] = useState<WorkflowInstance[]>([]);
   const [schedulerPolicy, setSchedulerPolicy] = useState(activeRuntimeScheduler.getPolicyName());
   const [workflowEvents, setWorkflowEvents] = useState<WorkflowEvent[]>([]);
@@ -98,6 +101,14 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [replayedState, setReplayedState] = useState<WorkflowInstance | null>(null);
   const [filterCorrelationId, setFilterCorrelationId] = useState("");
 
+  // III.3 States
+  const [workflowPackages, setWorkflowPackages] = useState<WorkflowPackage[]>([]);
+  const [searchText, setSearchText] = useState("");
+  const [searchDomain, setSearchDomain] = useState("");
+  const [validationReport, setValidationReport] = useState<PackageValidationReport | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<WorkflowPackage | null>(null);
+  const [importJson, setImportJson] = useState("");
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
@@ -107,13 +118,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setJobsQueue(activeExecutionManager.getQueueList());
     setNodes(activeNodeRegistry.getNodesList());
     setFederationLogs(activeFederationCoordinator.getQueryLogs());
-    setWorkflowTemplates(activeWorkflowEngine.getTemplatesList());
     setWorkflowInstances(activeWorkflowEngine.getInstancesList());
     setWorkflowEvents(activeWorkflowEventStore.getEventsList());
+    setWorkflowPackages(activeWorkflowRepository.getPackagesList());
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
-      // Reload from Store to ensure proper sequenceNumbers
       setWorkflowEvents(activeWorkflowEventStore.getEventsList());
       if (event.eventType === "SchedulingDecisionMade" && event.payload?.decision) {
         setLatestDecision(event.payload.decision);
@@ -314,9 +324,35 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setReplayedState(nextState);
   };
 
+  // III.3 Handlers
+  const handleImportWorkflowPackage = () => {
+    try {
+      const parsed = JSON.parse(importJson) as WorkflowPackage;
+      const report = activeWorkflowValidator.validatePackage(parsed);
+      setValidationReport(report);
+
+      if (report.overallPassed) {
+        activeWorkflowRepository.publishPackage(parsed);
+        setWorkflowPackages(activeWorkflowRepository.getPackagesList());
+        setMockLogs(prev => [...prev, `[Repository] Package "${parsed.packageId}" imported successfully.`]);
+      } else {
+        setMockLogs(prev => [...prev, `[Repository Validation Error] Package "${parsed.packageId}" rejected.`]);
+      }
+    } catch (err: any) {
+      setMockLogs(prev => [...prev, `[Import JSON Error] Failed to parse JSON package schema: ${err.message}`]);
+    }
+  };
+
+  const handleValidateSelected = (pkg: WorkflowPackage) => {
+    const report = activeWorkflowValidator.validatePackage(pkg);
+    setValidationReport(report);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
+
+  const catalogPackages = activeWorkflowRepository.getByFilters(searchText, searchDomain);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-[400px] border-t border-cyan-500/40 bg-slate-950/95 backdrop-blur-2xl z-50 text-slate-100 flex flex-col font-sans shadow-2xl">
@@ -418,7 +454,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "federation"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
             }`}
           >
             📡 Federation
@@ -431,7 +467,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "workflows"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
             }`}
           >
             ⚙️ Workflow Dashboard
@@ -441,7 +477,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
               activeTab === "replayDebugger"
                 ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
-                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
             }`}
           >
             ⏳ Replay Debugger
@@ -1077,7 +1113,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-cyan-300">⚙️ WORKFLOW ORCHESTRATION CONSOLE</h3>
-                  <p className="text-[10px] text-slate-500">Instantiate templates, track dynamic DAG schedules, and monitor event stream timelines</p>
+                  <p className="text-[10px] text-slate-500">Search packages, track DAG schedules, and monitor event stream timelines</p>
                 </div>
                 <div className="flex gap-2 items-center">
                   <span className="text-[10px] text-slate-400 font-mono">Policy: <strong>{schedulerPolicy}</strong></span>
@@ -1090,26 +1126,75 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 </div>
               </div>
 
+              {/* Search catalog bars */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Search packages..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[10.5px] font-mono text-cyan-300 focus:outline-none w-1/3"
+                />
+                <select
+                  value={searchDomain}
+                  onChange={(e) => setSearchDomain(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[10.5px] text-slate-300 focus:outline-none"
+                >
+                  <option value="">All Domains</option>
+                  <option value="Fluid Dynamics">Fluid Dynamics</option>
+                  <option value="Data Analytics">Data Analytics</option>
+                </select>
+              </div>
+
               {/* Four Synchronized Panels Workspace */}
               <div className="grid grid-cols-3 gap-4">
-                {/* Panel A: Templates List & Instantiator */}
+                {/* Panel A: Templates Catalog */}
                 <div className="flex flex-col gap-2.5 border-r border-slate-800/60 pr-4">
-                  <span className="font-bold text-slate-400 text-[10.5px]">A. Reusable Templates</span>
-                  {workflowTemplates.map(t => (
-                    <div key={t.workflowId} className="p-2.5 bg-slate-900 border border-slate-850 rounded flex flex-col gap-1">
+                  <span className="font-bold text-slate-400 text-[10.5px]">A. Reusable Template Catalog</span>
+                  {catalogPackages.map(pkg => (
+                    <div
+                      key={pkg.packageId}
+                      onClick={() => {
+                        setSelectedPackage(pkg);
+                        handleValidateSelected(pkg);
+                      }}
+                      className={`p-2.5 border rounded flex flex-col gap-1 cursor-pointer hover:border-cyan-500/50 ${
+                        selectedPackage?.packageId === pkg.packageId ? "bg-slate-900 border-cyan-500" : "bg-slate-900/60 border-slate-850"
+                      }`}
+                    >
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-slate-200">{t.name}</span>
-                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-500">v{t.version}</span>
+                        <span className="font-bold text-slate-200">{pkg.metadata.packageName}</span>
+                        <span className="text-[8px] bg-slate-800 px-1 py-0.5 rounded text-slate-500">v{pkg.metadata.version}</span>
                       </div>
-                      <p className="text-[9px] text-slate-500 leading-tight">{t.description}</p>
+                      <span className="text-[8.5px] text-slate-500 font-mono">Domain: {pkg.metadata.domain} | Author: {pkg.metadata.author}</span>
                       <button
-                        onClick={() => handleInstantiateWorkflow(t.workflowId)}
-                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] mt-1.5 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleInstantiateWorkflow(pkg.definition.workflowId);
+                        }}
+                        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] mt-1.5 cursor-pointer w-full"
                       >
                         Instantiate
                       </button>
                     </div>
                   ))}
+
+                  {/* Schema Package Importer Console */}
+                  <div className="mt-2 border-t border-slate-850 pt-2 flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-400 text-[9.5px]">Import Workflow Package (JSON)</span>
+                    <textarea
+                      placeholder='{"packageId": "custom-pkg", ...}'
+                      value={importJson}
+                      onChange={(e) => setImportJson(e.target.value)}
+                      className="bg-slate-900 border border-slate-800 rounded p-1.5 font-mono text-[9px] text-cyan-300 focus:outline-none w-full h-[50px] resize-none"
+                    />
+                    <button
+                      onClick={handleImportWorkflowPackage}
+                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-1 rounded text-[9.5px] cursor-pointer"
+                    >
+                      Validate & Import Package
+                    </button>
+                  </div>
                 </div>
 
                 {/* Panel B: Active Execution & Graph */}
@@ -1148,26 +1233,31 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   )}
                 </div>
 
-                {/* Panel C: Event Stream & Scheduling Inspector */}
+                {/* Panel C: Event Stream & Validation Report */}
                 <div className="flex flex-col gap-3">
-                  {/* Event Stream Timeline */}
+                  {/* Validation Report */}
                   <div className="flex flex-col gap-2">
-                    <span className="font-bold text-slate-400 text-[10.5px]">C. Event Stream Timeline</span>
-                    <div className="bg-slate-900 border border-slate-850 p-2.5 rounded max-h-[120px] overflow-y-auto flex flex-col gap-1.5 font-mono text-[8.5px]">
-                      {workflowEvents.length === 0 ? (
-                        <span className="text-slate-600 italic">Listening for lifecycle events...</span>
-                      ) : (
-                        workflowEvents.map(evt => (
-                          <div key={evt.eventId} className="border-b border-slate-850/60 pb-1 last:border-0">
-                            <div className="flex justify-between text-[8px]">
-                              <span className="text-purple-300 font-bold">{evt.eventType}</span>
-                              <span className="text-slate-500">{evt.timestamp}</span>
+                    <span className="font-bold text-slate-400 text-[10.5px]">C. Package Validation Report</span>
+                    {validationReport ? (
+                      <div className="p-2.5 bg-slate-900 border border-slate-800 rounded flex flex-col gap-1 text-[9px]">
+                        <div className="flex justify-between border-b border-slate-850 pb-1 font-bold">
+                          <span>Report: {validationReport.packageId}</span>
+                          <span className={validationReport.overallPassed ? "text-emerald-400" : "text-red-400"}>
+                            {validationReport.overallPassed ? "PASSED" : "FAILED"}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1 mt-1 font-mono text-[8px]">
+                          {validationReport.stages.map(st => (
+                            <div key={st.stage} className="flex justify-between">
+                              <span className="text-slate-400">{st.stage}:</span>
+                              <span className={st.status === "PASSED" ? "text-emerald-400" : "text-red-400"}>{st.status}</span>
                             </div>
-                            <span className="text-slate-400 block mt-0.5">seq: {evt.sequenceNumber} | schema: {evt.schemaVersion}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-650 font-mono italic">Select package to audit compliance validations.</span>
+                    )}
                   </div>
 
                   {/* Scheduling Inspector */}
@@ -1255,7 +1345,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <pre className="text-[8.5px] leading-snug">{JSON.stringify(selectedEvent.payload, null, 2)}</pre>
                     </div>
                   ) : (
-                    <span className="text-slate-600 font-mono italic">Select an event from the timeline to inspect payloads.</span>
+                    <span className="text-slate-650 font-mono italic">Select an event from the timeline to inspect payloads.</span>
                   )}
                 </div>
 
@@ -1297,7 +1387,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       </div>
                     </div>
                   ) : (
-                    <span className="text-slate-600 font-mono italic">Click any event to initiate replay state reduction cycles.</span>
+                    <span className="text-slate-650 font-mono italic">Click any event to initiate replay state reduction cycles.</span>
                   )}
                 </div>
               </div>
