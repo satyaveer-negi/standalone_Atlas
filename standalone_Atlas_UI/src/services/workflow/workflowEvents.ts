@@ -16,6 +16,8 @@ export type WorkflowEventType =
 
 // 🕸️ PROGRAM III.1: EVENT ENVELOPE CONTRACT
 export interface WorkflowEvent<T = any> {
+  schemaVersion: number;
+  sequenceNumber: number;
   eventId: string;
   workflowId: string;
   stepId?: string;

@@ -78,6 +78,8 @@ export class WorkflowEngine {
     // Publish event
     const context = createPlatformContext(instanceId);
     activeWorkflowEventBus.publish({
+      schemaVersion: 1,
+      sequenceNumber: 0,
       eventId: `evt-cr-${Date.now()}`,
       workflowId: instanceId,
       timestamp: new Date().toLocaleTimeString(),
@@ -101,6 +103,8 @@ export class WorkflowEngine {
 
     // Publish event StepStarted
     activeWorkflowEventBus.publish({
+      schemaVersion: 1,
+      sequenceNumber: 0,
       eventId: `evt-ss-${Date.now()}`,
       workflowId: instanceId,
       stepId,
@@ -121,6 +125,8 @@ export class WorkflowEngine {
 
       // Publish event SchedulingDecisionMade
       activeWorkflowEventBus.publish({
+        schemaVersion: 1,
+        sequenceNumber: 0,
         eventId: `evt-sd-${Date.now()}`,
         workflowId: instanceId,
         stepId,
@@ -141,6 +147,8 @@ export class WorkflowEngine {
 
       // Publish event StepCompleted
       activeWorkflowEventBus.publish({
+        schemaVersion: 1,
+        sequenceNumber: 0,
         eventId: `evt-sc-${Date.now()}`,
         workflowId: instanceId,
         stepId,
@@ -165,6 +173,8 @@ export class WorkflowEngine {
       if (!activePending) {
         instance.state = "Completed";
         activeWorkflowEventBus.publish({
+          schemaVersion: 1,
+          sequenceNumber: 0,
           eventId: `evt-wc-${Date.now()}`,
           workflowId: instanceId,
           timestamp: new Date().toLocaleTimeString(),
@@ -177,6 +187,8 @@ export class WorkflowEngine {
       step.state = "Failed";
       instance.state = "Failed";
       activeWorkflowEventBus.publish({
+        schemaVersion: 1,
+        sequenceNumber: 0,
         eventId: `evt-sf-${Date.now()}`,
         workflowId: instanceId,
         stepId,

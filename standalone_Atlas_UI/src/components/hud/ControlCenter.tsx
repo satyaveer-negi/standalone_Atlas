@@ -31,6 +31,8 @@ import { activeRuntimeScheduler, LeastLoadedPolicy, LowestLatencyPolicy } from "
 import type { SchedulingDecision } from "../../services/runtime/scheduler";
 import { activeWorkflowEventBus } from "../../services/workflow/workflowEvents";
 import type { WorkflowEvent } from "../../services/workflow/workflowEvents";
+import { activeWorkflowEventStore } from "../../services/workflow/workflowEventStore";
+import { activeReplayEngine } from "../../services/workflow/replayEngine";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -53,7 +55,8 @@ type ActiveWorkspace =
   | "kql"
   | "nodes"
   | "federation"
-  | "workflows";
+  | "workflows"
+  | "replayDebugger";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeTab, setActiveTab] = useState<ActiveWorkspace>("health");
@@ -90,6 +93,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [workflowEvents, setWorkflowEvents] = useState<WorkflowEvent[]>([]);
   const [latestDecision, setLatestDecision] = useState<SchedulingDecision | null>(null);
 
+  // III.2 States
+  const [selectedEvent, setSelectedEvent] = useState<WorkflowEvent | null>(null);
+  const [replayedState, setReplayedState] = useState<WorkflowInstance | null>(null);
+  const [filterCorrelationId, setFilterCorrelationId] = useState("");
+
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
     setTraces(activeExecutionTraceStore.getTracesList());
@@ -101,10 +109,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setFederationLogs(activeFederationCoordinator.getQueryLogs());
     setWorkflowTemplates(activeWorkflowEngine.getTemplatesList());
     setWorkflowInstances(activeWorkflowEngine.getInstancesList());
+    setWorkflowEvents(activeWorkflowEventStore.getEventsList());
 
     // Subscribe to Event Bus lifecycle events
     const unsubscribe = activeWorkflowEventBus.subscribe((event) => {
-      setWorkflowEvents(prev => [event, ...prev]);
+      // Reload from Store to ensure proper sequenceNumbers
+      setWorkflowEvents(activeWorkflowEventStore.getEventsList());
       if (event.eventType === "SchedulingDecisionMade" && event.payload?.decision) {
         setLatestDecision(event.payload.decision);
       }
@@ -273,6 +283,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const handleInstantiateWorkflow = (defId: string) => {
     activeWorkflowEngine.createInstance(defId);
     setWorkflowInstances(activeWorkflowEngine.getInstancesList());
+    setWorkflowEvents(activeWorkflowEventStore.getEventsList());
   };
 
   const handleRunWorkflowStep = async (instId: string, stepId: string) => {
@@ -280,7 +291,32 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setWorkflowInstances(activeWorkflowEngine.getInstancesList());
     setNodes(activeNodeRegistry.getNodesList());
     setJobsQueue([...activeExecutionManager.getQueueList()]);
+    setWorkflowEvents(activeWorkflowEventStore.getEventsList());
   };
+
+  // III.2 Replay Actions
+  const handleStartReplaySession = (workflowId: string) => {
+    const events = activeWorkflowEventStore.getByWorkflow(workflowId);
+    if (events.length === 0) return;
+
+    activeReplayEngine.loadHistory(events);
+    setReplayedState(activeReplayEngine.stepForward());
+    setMockLogs(prev => [...prev, `[Replay Engine] Loaded ${events.length} events. Sequence step 1 applied.`]);
+  };
+
+  const handleStepReplay = () => {
+    const nextState = activeReplayEngine.stepForward();
+    setReplayedState(nextState);
+  };
+
+  const handlePlayAllReplay = () => {
+    const nextState = activeReplayEngine.playAll();
+    setReplayedState(nextState);
+  };
+
+  const filteredEvents = filterCorrelationId
+    ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
+    : workflowEvents;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-[400px] border-t border-cyan-500/40 bg-slate-950/95 backdrop-blur-2xl z-50 text-slate-100 flex flex-col font-sans shadow-2xl">
@@ -399,6 +435,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             ⚙️ Workflow Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab("replayDebugger")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "replayDebugger"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-450 text-cyan-100"
+            }`}
+          >
+            ⏳ Replay Debugger
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -603,21 +649,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                 <p className="text-[10px] text-slate-500">Component loads orders and dependencies verification</p>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">Loaded Component</span>
-                  <p className="font-bold text-slate-200 mt-1">knowledgeRuntime</p>
-                  <div className="flex justify-between items-center mt-3 text-[10px]">
-                    <span className="text-emerald-400 font-bold">ACTIVE</span>
-                    <span className="text-slate-400 font-mono">1.2 MB</span>
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold">Loaded Component</span>
+                    <p className="font-bold text-slate-200 mt-1">knowledgeRuntime</p>
                   </div>
-                </div>
-                <div className="p-3 bg-slate-900 border border-slate-800 rounded">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">Unloaded Component</span>
-                  <p className="font-bold text-slate-400 mt-1">learningRuntime</p>
-                  <div className="flex justify-between items-center mt-3 text-[10px]">
-                    <span className="text-slate-500">UNLOADED</span>
-                    <span className="text-slate-600 font-mono">0 KB</span>
-                  </div>
+                  <span className="text-emerald-400 font-bold text-[10px]">ACTIVE</span>
                 </div>
               </div>
             </div>
@@ -1034,7 +1071,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             </div>
           )}
 
-          {/* ⚙️ Workflow Dashboard Workspace (Enriched with Events and Explainable Scheduler) */}
+          {/* ⚙️ Workflow Dashboard Workspace */}
           {activeTab === "workflows" && (
             <div className="flex flex-col gap-4">
               <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
@@ -1126,7 +1163,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                               <span className="text-purple-300 font-bold">{evt.eventType}</span>
                               <span className="text-slate-500">{evt.timestamp}</span>
                             </div>
-                            <span className="text-slate-400 block mt-0.5">corrId: {evt.platformContext.identity.correlationId}</span>
+                            <span className="text-slate-400 block mt-0.5">seq: {evt.sequenceNumber} | schema: {evt.schemaVersion}</span>
                           </div>
                         ))
                       )}
@@ -1154,6 +1191,114 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <span className="text-slate-600 font-mono italic text-[9px]">No scheduling decisions made yet.</span>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ⏳ Replay Debugger Workspace */}
+          {activeTab === "replayDebugger" && (
+            <div className="flex flex-col gap-4">
+              <div className="border-b border-slate-800 pb-2 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">⏳ REPLAY DEBUGGER CONSOLE</h3>
+                  <p className="text-[10px] text-slate-500">Durable Event Sourcing: Reconstruct history state reducers from append-only Store logs</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Filter Correlation ID"
+                    value={filterCorrelationId}
+                    onChange={(e) => setFilterCorrelationId(e.target.value)}
+                    className="bg-slate-900 border border-slate-800 rounded px-2.5 py-0.5 font-mono text-cyan-300 text-[10px] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Synchronized Replay Panels */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* Panel 1: Timeline */}
+                <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto border-r border-slate-800/60 pr-4">
+                  <span className="font-bold text-slate-400 text-[10.5px]">1. Durable Events Timeline</span>
+                  {filteredEvents.length === 0 ? (
+                    <span className="text-slate-600 font-mono italic">No events found.</span>
+                  ) : (
+                    filteredEvents.map(evt => (
+                      <div
+                        key={evt.eventId}
+                        onClick={() => {
+                          setSelectedEvent(evt);
+                          handleStartReplaySession(evt.workflowId);
+                        }}
+                        className={`p-2 bg-slate-900 border rounded flex flex-col gap-0.5 cursor-pointer hover:border-cyan-500/50 ${
+                          selectedEvent?.eventId === evt.eventId ? "border-cyan-500 text-cyan-300" : "border-slate-850"
+                        }`}
+                      >
+                        <div className="flex justify-between text-[9px]">
+                          <span className="font-bold">Seq {evt.sequenceNumber} | {evt.eventType}</span>
+                          <span className="text-slate-500">{evt.timestamp}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Panel 2: Details Inspector */}
+                <div className="flex flex-col gap-2 border-r border-slate-800/60 pr-4">
+                  <span className="font-bold text-slate-400 text-[10.5px]">2. Payload Details Inspector</span>
+                  {selectedEvent ? (
+                    <div className="p-3 bg-slate-900 border border-slate-850 rounded font-mono text-[9px] text-slate-300 overflow-x-auto max-h-[200px]">
+                      <div>Event ID: <strong>{selectedEvent.eventId}</strong></div>
+                      <div>Workflow: <strong>{selectedEvent.workflowId}</strong></div>
+                      <div>Timestamp: <strong>{selectedEvent.timestamp}</strong></div>
+                      <div className="mt-2 text-cyan-400">Payload Schema:</div>
+                      <pre className="text-[8.5px] leading-snug">{JSON.stringify(selectedEvent.payload, null, 2)}</pre>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 font-mono italic">Select an event from the timeline to inspect payloads.</span>
+                  )}
+                </div>
+
+                {/* Panel 3: Replay Console */}
+                <div className="flex flex-col gap-3">
+                  <span className="font-bold text-slate-400 text-[10.5px]">3. Reducer Replay Player</span>
+                  {replayedState ? (
+                    <div className="p-3 bg-slate-900 border border-purple-500/30 rounded flex flex-col gap-2">
+                      <div className="flex justify-between items-center font-mono text-[9px]">
+                        <span className="text-purple-300 font-bold">{replayedState.instanceId}</span>
+                        <span>State: {replayedState.state}</span>
+                      </div>
+
+                      {/* Replay Step controls */}
+                      <div className="flex gap-2 justify-center py-2 border-t border-b border-slate-850/60">
+                        <button
+                          onClick={handleStepReplay}
+                          className="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 px-2 py-0.5 rounded text-[9px] cursor-pointer"
+                        >
+                          ⏭ Step Forward
+                        </button>
+                        <button
+                          onClick={handlePlayAllReplay}
+                          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-2 py-0.5 rounded text-[9px] cursor-pointer"
+                        >
+                          ▶ Play All
+                        </button>
+                      </div>
+
+                      {/* Reconstructed State visualizer */}
+                      <div className="flex flex-col gap-1.5 mt-1.5 text-[9.5px]">
+                        <span className="text-slate-400 font-bold">Reconstructed Step States:</span>
+                        {replayedState.steps.map(s => (
+                          <div key={s.stepId} className="flex justify-between">
+                            <span className="text-slate-300">{s.name}:</span>
+                            <span className="font-mono font-bold text-cyan-300">{s.state} {s.assignedNode ? `(${s.assignedNode})` : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 font-mono italic">Click any event to initiate replay state reduction cycles.</span>
+                  )}
                 </div>
               </div>
             </div>
