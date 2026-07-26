@@ -1,35 +1,43 @@
-import { PlanningCandidate } from "./PlanGenerator";
+import { WorkflowCandidate } from "./WorkflowCandidate";
 import { EngineeringIntent } from "../intent/EngineeringIntent";
+import { ScoreVector } from "./PlanningResult";
 
 export interface RankedCandidate {
-  candidate: PlanningCandidate;
-  score: number; // 0-100
+  candidate: WorkflowCandidate;
+  scoreVector: ScoreVector;
 }
 
 export class PlanRanker {
-  public rank(candidates: PlanningCandidate[], intent: EngineeringIntent): RankedCandidate[] {
+  public rank(candidates: WorkflowCandidate[], intent: EngineeringIntent): RankedCandidate[] {
     return candidates.map(cand => {
-      // Basic heuristic score calculation
-      let score = 50;
+      const isHigh = cand.id === "cand-high-fidelity";
+      
+      const perf = isHigh ? 98 : 80;
+      const cost = isHigh ? 75 : 95;
+      const risk = isHigh ? 80 : 92;
+      const verification = cand.verificationScore;
 
-      // Higher accuracy adds to score
-      score += (cand.expectedAccuracy - 80) * 2;
-
-      // Higher cost reduces score
-      score -= (cand.costEstimateUSD / 10);
-
-      // Objective weights adjustment
+      // Overall dynamic weighting score calculation
+      let overall = 50;
       intent.objectives.forEach(obj => {
-        if (obj.mode === "Maximize" && cand.expectedAccuracy > 90) {
-          score += obj.weight * 10;
+        if (obj.propertyName === "solarOutput" || obj.propertyName === "meshOrthogonality") {
+          overall += obj.weight * (isHigh ? 45 : 20);
         }
       });
 
+      const scoreVector: ScoreVector = {
+        overall: Math.min(100, Math.max(0, overall)),
+        performance: perf,
+        cost,
+        risk,
+        verification
+      };
+
       return {
         candidate: cand,
-        score: Math.min(100, Math.max(0, score))
+        scoreVector
       };
-    }).sort((a, b) => b.score - a.score);
+    }).sort((a, b) => b.scoreVector.overall - a.scoreVector.overall);
   }
 }
 

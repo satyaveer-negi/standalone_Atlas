@@ -1,18 +1,10 @@
 import { EngineeringIntent } from "../intent/EngineeringIntent";
 import { WorkflowGraph } from "../../../workflow/model/WorkflowGraph";
-
-export interface PlanningCandidate {
-  id: string;
-  name: string;
-  graph: WorkflowGraph;
-  costEstimateUSD: number;
-  complexityScore: number; // 1-10
-  expectedAccuracy: number; // percentage
-}
+import { WorkflowCandidate } from "./WorkflowCandidate";
 
 export class PlanGenerator {
-  public generateCandidates(intent: EngineeringIntent): PlanningCandidate[] {
-    const candidates: PlanningCandidate[] = [];
+  public generateCandidates(intent: EngineeringIntent): WorkflowCandidate[] {
+    const candidates: WorkflowCandidate[] = [];
 
     // Candidate 1: High Fidelity / High Cost
     const graphHigh = new WorkflowGraph();
@@ -62,9 +54,13 @@ export class PlanGenerator {
       id: "cand-high-fidelity",
       name: "Plan Alpha: High-Fidelity Ansys CFD Analysis",
       graph: graphHigh,
-      costEstimateUSD: 450,
-      complexityScore: 8,
-      expectedAccuracy: 98
+      estimatedDurationMs: 3600000,
+      estimatedResources: ["gpu-node-01", "ansys-license-01"],
+      estimatedCostUSD: 450,
+      estimatedRiskScore: 8,
+      verificationScore: 98,
+      confidence: 0.98,
+      explanation: "Uses Ansys Fluent CFD for high-resolution fluid drag validation, yielding highly reliable results at higher compute costs."
     });
 
     // Candidate 2: Fast Heuristics / Low Cost
@@ -115,9 +111,13 @@ export class PlanGenerator {
       id: "cand-fast-heuristics",
       name: "Plan Beta: Fast Analytical Solver Profile",
       graph: graphFast,
-      costEstimateUSD: 50,
-      complexityScore: 3,
-      expectedAccuracy: 85
+      estimatedDurationMs: 60000,
+      estimatedResources: ["cpu-node-01"],
+      estimatedCostUSD: 50,
+      estimatedRiskScore: 3,
+      verificationScore: 85,
+      confidence: 0.85,
+      explanation: "Applies linear heuristics simulation via Matlab script, yielding rapid approximations suitable for fast validation."
     });
 
     return candidates;

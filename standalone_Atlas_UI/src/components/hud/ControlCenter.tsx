@@ -93,7 +93,9 @@ import { activeIntentExplanationEngine } from "../../services/intelligence/expla
 import { activeGoalHierarchy } from "../../services/intelligence/intent/GoalHierarchy";
 import type { EngineeringIntent } from "../../services/intelligence/intent/EngineeringIntent";
 import { activeAutonomousPlanner } from "../../services/intelligence/planning/AutonomousPlanner";
-import type { PlanningResult } from "../../services/intelligence/planning/AutonomousPlanner";
+import type { PlanningResult } from "../../services/intelligence/planning/PlanningResult";
+import { activePlanningRepository } from "../../services/intelligence/repository/PlanningRepository";
+import { activePlanningExplanationEngine } from "../../services/intelligence/explainability/PlanningExplanationEngine";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -958,11 +960,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
       return;
     }
     const result = activeAutonomousPlanner.plan(activeIntent);
+    activePlanningRepository.savePlanningResult(result);
     setPlanningResult(result);
 
     setMockLogs(prev => [
       ...prev,
-      `[Autonomous Planner] Generated and ranked ${result.evaluations.length} visual workflow candidates.`
+      `[Autonomous Planner] Generated and ranked ${result.candidates.length} visual workflow candidates.`
     ]);
   };
 
@@ -3113,36 +3116,47 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Candidate Planning Alternatives Matrix</span>
                   <div className="max-h-[220px] overflow-y-auto flex flex-col gap-2 mt-1">
                     {planningResult ? (
-                      planningResult.evaluations.map((evalNode, idx) => (
-                        <div key={idx} className="bg-slate-900 p-2.5 border border-slate-800 rounded flex justify-between items-center gap-4">
-                          <div className="flex flex-col gap-1 w-2/3">
-                            <span className="font-bold text-slate-200 text-[10px]">{evalNode.candidate.name}</span>
-                            <div className="flex gap-3 text-slate-500 text-[8.5px] mt-0.5">
-                              <span>Cost: <strong className="text-cyan-300">${evalNode.candidate.costEstimateUSD}</strong></span>
-                              <span>Complexity: <strong className="text-yellow-400">{evalNode.candidate.complexityScore}/10</strong></span>
-                              <span>Accuracy: <strong className="text-purple-300">{evalNode.candidate.expectedAccuracy}%</strong></span>
-                              <span>Risk: <strong className={evalNode.tradeoffs.riskRating === "High" ? "text-red-400" : "text-emerald-400"}>{evalNode.tradeoffs.riskRating}</strong></span>
+                      planningResult.candidates.map((cand, idx) => {
+                        const rank = planningResult.rankings.find(r => r.candidateId === cand.id);
+                        const tradeoff = planningResult.tradeoffs.find(t => t.candidateId === cand.id);
+                        const expChain = activePlanningExplanationEngine.explainPlanningDecision(planningResult);
+
+                        return (
+                          <div key={idx} className="bg-slate-900 p-2.5 border border-slate-800 rounded flex justify-between items-center gap-4">
+                            <div className="flex flex-col gap-1 w-2/3">
+                              <span className="font-bold text-slate-200 text-[10px]">{cand.name}</span>
+                              <p className="text-slate-500 text-[8px] italic leading-tight">{cand.explanation}</p>
+                              <div className="flex flex-wrap gap-2 text-slate-400 text-[8px] mt-1 leading-normal">
+                                <span>Cost: <strong className="text-cyan-300">${cand.estimatedCostUSD}</strong></span>
+                                <span>Complexity: <strong className="text-yellow-400">{cand.estimatedRiskScore}/10</strong></span>
+                                <span>Accuracy: <strong className="text-purple-300">{cand.verificationScore}%</strong></span>
+                                <span>Energy: <strong className="text-orange-400">{tradeoff?.stats.energyKWh} kWh</strong></span>
+                                <span>Reliability: <strong className="text-emerald-400">{tradeoff?.stats.reliability}%</strong></span>
+                                <span>Maintainability: <strong className="text-blue-300">{tradeoff?.stats.maintainability}%</strong></span>
+                                <span>Resources: <strong className="text-slate-300">{cand.estimatedResources.join(", ")}</strong></span>
+                              </div>
+                              <div className="text-[7.5px] text-slate-500 leading-tight mt-1">
+                                <strong>Decision Evidence Factors:</strong> {expChain.factors.join(" | ")}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5 w-1/3">
+                              <div className="flex flex-col items-end gap-0.5 text-right">
+                                <span className="text-slate-400 text-[8.5px]">Overall Score: <strong className="text-cyan-300 font-bold text-xs">{rank?.scoreVector.overall || 0}</strong></span>
+                                <span className="text-slate-500 text-[7.5px]">Perf: {rank?.scoreVector.performance} | Cost: {rank?.scoreVector.cost} | Risk: {rank?.scoreVector.risk} | V&V: {rank?.scoreVector.verification}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-emerald-950 text-emerald-450">Feasible</span>
+                                <button
+                                  onClick={() => handleLoadPlanIntoWorkflowStudio(cand)}
+                                  className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-800/40 rounded px-2 py-0.5 text-[8.5px] font-bold cursor-pointer"
+                                >
+                                  Load into Studio
+                                </button>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1.5 w-1/3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-400 text-[8.5px]">Rank Score:</span>
-                              <span className="text-cyan-300 font-bold text-xs">{evalNode.score.toFixed(0)}</span>
-                            </div>
-                            <div className="flex gap-2">
-                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
-                                evalNode.feasible ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
-                              }`}>{evalNode.feasible ? "Feasible" : "Infeasible"}</span>
-                              <button
-                                onClick={() => handleLoadPlanIntoWorkflowStudio(evalNode.candidate)}
-                                className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-800/40 rounded px-2 py-0.5 text-[8.5px] font-bold cursor-pointer"
-                              >
-                                Load into Studio
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <span className="text-slate-600 italic">No alternative workflow plans generated. Click "Generate Workflow Plans".</span>
                     )}

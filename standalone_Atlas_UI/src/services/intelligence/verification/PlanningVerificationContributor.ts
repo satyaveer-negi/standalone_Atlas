@@ -30,15 +30,15 @@ export class PlanningVerificationContributor {
     results.push({
       id: "planning-assert-candidates-generation",
       name: "Autonomous Planner Alternatives Generation Audits",
-      status: planResult.evaluations.length >= 2 ? "Pass" : "Fail",
+      status: planResult.candidates.length >= 2 ? "Pass" : "Fail",
       durationMs: 2,
-      message: `Planner generated ${planResult.evaluations.length} candidate workflow plans.`
+      message: `Planner generated ${planResult.candidates.length} candidate workflow plans.`
     });
 
     results.push({
       id: "planning-assert-rankings-sorting",
       name: "Plan Ranker Relative Score Calculation Verification",
-      status: planResult.evaluations[0].score >= planResult.evaluations[1].score ? "Pass" : "Fail",
+      status: planResult.rankings[0].scoreVector.overall >= planResult.rankings[1].scoreVector.overall ? "Pass" : "Fail",
       durationMs: 1,
       message: "Top candidate scored higher than secondary fallback choices."
     });

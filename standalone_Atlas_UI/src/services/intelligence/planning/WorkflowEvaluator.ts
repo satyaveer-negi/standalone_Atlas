@@ -1,4 +1,4 @@
-import { PlanningCandidate } from "./PlanGenerator";
+import { WorkflowCandidate } from "./WorkflowCandidate";
 import { EngineeringIntent } from "../intent/EngineeringIntent";
 
 export interface EvaluationReport {
@@ -7,13 +7,13 @@ export interface EvaluationReport {
 }
 
 export class WorkflowEvaluator {
-  public evaluate(candidate: PlanningCandidate, intent: EngineeringIntent): EvaluationReport {
+  public evaluate(candidate: WorkflowCandidate, intent: EngineeringIntent): EvaluationReport {
     const violations: string[] = [];
 
-    // Operational limits verification checks
+    // Complete checking safety limits
     intent.constraints.forEach(c => {
-      if (c.category === "Safety" && candidate.complexityScore > 9) {
-        violations.push(`Constraint violation: Candidate complexity ${candidate.complexityScore} exceeds safe ceiling limit.`);
+      if (c.category === "Safety" && candidate.estimatedRiskScore > 9) {
+        violations.push(`Constraint violation: Candidate risk ${candidate.estimatedRiskScore} exceeds safety ceiling limits.`);
       }
     });
 

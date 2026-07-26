@@ -1,22 +1,10 @@
 import { EngineeringIntent } from "../intent/EngineeringIntent";
-import { activePlanGenerator, PlanningCandidate } from "./PlanGenerator";
+import { activePlanGenerator } from "./PlanGenerator";
 import { activeWorkflowEvaluator } from "./WorkflowEvaluator";
-import { activeTradeoffAnalyzer, TradeoffMetrics } from "./TradeoffAnalyzer";
-import { activePlanRanker, RankedCandidate } from "./PlanRanker";
+import { activeTradeoffAnalyzer } from "./TradeoffAnalyzer";
+import { activePlanRanker } from "./PlanRanker";
 import { activeExecutionAdvisor } from "./ExecutionAdvisor";
-
-export interface PlanEvaluationNode {
-  candidate: PlanningCandidate;
-  feasible: boolean;
-  score: number;
-  tradeoffs: TradeoffMetrics;
-}
-
-export interface PlanningResult {
-  intentId: string;
-  evaluations: PlanEvaluationNode[];
-  recommendationAdvice: string;
-}
+import { PlanningResult } from "./PlanningResult";
 
 export class AutonomousPlanner {
   public plan(intent: EngineeringIntent): PlanningResult {
@@ -24,24 +12,27 @@ export class AutonomousPlanner {
     
     // Evaluate, analyze tradeoffs, and rank
     const ranked = activePlanRanker.rank(candidates, intent);
-    const evaluations: PlanEvaluationNode[] = ranked.map(rk => {
-      const evalReport = activeWorkflowEvaluator.evaluate(rk.candidate, intent);
-      const tradeoffs = activeTradeoffAnalyzer.analyze(rk.candidate);
-
-      return {
-        candidate: rk.candidate,
-        feasible: evalReport.feasible,
-        score: rk.score,
-        tradeoffs
-      };
-    });
-
     const advice = activeExecutionAdvisor.formulateAdvice(ranked);
 
+    const tradeoffs = candidates.map(cand => ({
+      candidateId: cand.id,
+      stats: activeTradeoffAnalyzer.analyze(cand)
+    }));
+
+    const rankings = ranked.map(rk => ({
+      candidateId: rk.candidate.id,
+      scoreVector: rk.scoreVector
+    }));
+
     return {
-      intentId: intent.id,
-      evaluations,
-      recommendationAdvice: advice
+      intent,
+      candidates,
+      rankings,
+      tradeoffs,
+      recommendationAdvice: advice,
+      confidence: ranked[0]?.candidate.confidence || 0.9,
+      explainabilityEvidenceId: `exp-trace-${Date.now()}`,
+      createdAt: new Date().toISOString()
     };
   }
 }

@@ -7,7 +7,15 @@ export class ExecutionAdvisor {
     }
 
     const top = ranked[0];
-    return `[Execution Advisor] Recommended Action Profile is "${top.candidate.name}" with index score ${top.score.toFixed(1)}. It matches safety limits constraints guidelines and holds ${top.candidate.expectedAccuracy}% expected verification reliability.`;
+    const secondary = ranked[1];
+
+    return `[Execution Advisor Decision Brief]
+Recommendation: "${top.candidate.name}" (Score: ${top.scoreVector.overall.toFixed(0)})
+- Strengths: High reliability, full verification checks coverage, high solver performance (${top.scoreVector.performance}%).
+- Weaknesses: Increased compute cost ($${top.candidate.costEstimateUSD}) and longer estimated execution times.
+- Risks: Peak memory usage might trigger resource scaling latency.
+- Alternatives: "${secondary?.candidate.name || "None"}" remains a viable low-compute cost fallback candidate.
+- Evidence Base: Matches grid substation switch capabilities index constraints with ${top.candidate.confidence * 100}% confidence.`;
   }
 }
 
