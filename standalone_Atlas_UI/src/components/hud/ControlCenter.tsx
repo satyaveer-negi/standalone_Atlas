@@ -150,6 +150,14 @@ import type { MetaCognitiveAssessment } from "../../services/intelligence/meta/M
 import type { CognitiveBenchmark } from "../../services/intelligence/meta/CognitiveBenchmark";
 import type { CognitiveEpisode } from "../../services/intelligence/meta/CognitiveEpisode";
 import type { CognitiveHealth } from "../../services/intelligence/meta/MetaCognitiveEvaluator";
+import { activeConstitutionGuard } from "../../services/intelligence/constitution/ConstitutionGuard";
+import { activeConstitutionEvaluator } from "../../services/intelligence/constitution/ConstitutionEvaluator";
+import { activeConstitutionRepository } from "../../services/intelligence/repository/ConstitutionRepository";
+import type { EngineeringConstitution } from "../../services/intelligence/constitution/EngineeringConstitution";
+import type { ConstitutionalDecision } from "../../services/intelligence/constitution/ConstitutionalDecision";
+import type { ConstitutionalViolation } from "../../services/intelligence/constitution/ConstitutionalViolation";
+import type { ConstitutionalException } from "../../services/intelligence/constitution/ConstitutionalException";
+import type { ConstitutionalComplianceReport } from "../../services/intelligence/constitution/ConstitutionalComplianceReport";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -187,6 +195,7 @@ type ActiveWorkspace =
   | "knowledgeSynthesis"
   | "engineeringEvolution"
   | "metaCognitive"
+  | "engineeringConstitution"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -319,6 +328,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [metaBenchmarks, setMetaBenchmarks] = useState<CognitiveBenchmark[]>(activeMetaCognitiveRepository.getBenchmarksList());
   const [metaEpisodes, setMetaEpisodes] = useState<CognitiveEpisode[]>([]);
   const [metaHealth, setMetaHealth] = useState<CognitiveHealth>(activeMetaCognitiveRepository.getHealth());
+  const [constitutionalPrinciples, setConstitutionalPrinciples] = useState<EngineeringConstitution[]>(activeConstitutionRepository.getPrinciplesList());
+  const [constitutionalDecisions, setConstitutionalDecisions] = useState<ConstitutionalDecision[]>([]);
+  const [constitutionalViolations, setConstitutionalViolations] = useState<ConstitutionalViolation[]>([]);
+  const [constitutionalExceptions, setConstitutionalExceptions] = useState<ConstitutionalException[]>([]);
+  const [constitutionalReports, setConstitutionalReports] = useState<ConstitutionalComplianceReport[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1418,6 +1432,82 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerConstitutionalAudit = () => {
+    const activeViolations = activeConstitutionRepository.getViolationsList().filter(v => v.status === "Violated");
+    const activeExceptions = activeConstitutionRepository.getExceptionsList();
+
+    const report = activeConstitutionEvaluator.compileComplianceReport(activeViolations.length, activeExceptions.length);
+    activeConstitutionRepository.addReport(report);
+
+    // Simulate Intercept
+    const dec = activeConstitutionGuard.interceptRequest("req-wind-sim-01", "Verifying turbine blade structural boundary limits compliance check.");
+    activeConstitutionRepository.saveDecision(dec);
+
+    setConstitutionalDecisions(activeConstitutionRepository.getDecisionsList());
+    setConstitutionalReports(activeConstitutionRepository.getReportsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Constitutional Audit] Compliance score compiled: ${report.overallScore}%. Intercept decision: ${dec.decisionStatus} for target ${dec.targetId}.`
+    ]);
+  };
+
+  const handleDeclareConstitutionalViolation = () => {
+    const v: ConstitutionalViolation = {
+      violationId: `vio-${Date.now()}`,
+      principleId: "cp-safe-01",
+      component: "Planner Strategy Engine",
+      severity: "Critical",
+      description: "Heuristic voltage boundaries exceeded maximum limits bounds without supervisor consensus override.",
+      rootCause: "Turbine load spikes triggered autonomous safety relaxation routine bypass.",
+      suggestedRemedy: "Review planner safety limits checking parameters.",
+      status: "Violated",
+      timestamp: new Date().toISOString()
+    };
+
+    activeConstitutionRepository.saveViolation(v);
+    setConstitutionalViolations(activeConstitutionRepository.getViolationsList());
+
+    // Trigger report refresh
+    const activeViolations = activeConstitutionRepository.getViolationsList().filter(v => v.status === "Violated");
+    const activeExceptions = activeConstitutionRepository.getExceptionsList();
+    const report = activeConstitutionEvaluator.compileComplianceReport(activeViolations.length, activeExceptions.length);
+    activeConstitutionRepository.addReport(report);
+    setConstitutionalReports(activeConstitutionRepository.getReportsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Constitutional Violation] DECLARED CRITICAL VIOLATION in Planner Strategy. Compliance score degraded to ${report.overallScore}%.`
+    ]);
+  };
+
+  const handleGrantConstitutionalException = () => {
+    const e: ConstitutionalException = {
+      exceptionId: `exc-${Date.now()}`,
+      principleId: "cp-evid-01",
+      justification: "Mesh optimization simulations transient calculations bypass for test cycles.",
+      approverName: "Operational Council Board",
+      expiryTimestamp: new Date(Date.now() + 3600 * 1000).toISOString(),
+      scopePath: "windTurbineMeshOptimizationWorkflow",
+      auditLink: "file:///C:/Users/HP/.gemini/antigravity-ide/brain/7e242918-7bc4-4b8b-a128-62d5f57154bd/ukop_constitution.md"
+    };
+
+    activeConstitutionRepository.saveException(e);
+    setConstitutionalExceptions(activeConstitutionRepository.getExceptionsList());
+
+    // Trigger report refresh
+    const activeViolations = activeConstitutionRepository.getViolationsList().filter(v => v.status === "Violated");
+    const activeExceptions = activeConstitutionRepository.getExceptionsList();
+    const report = activeConstitutionEvaluator.compileComplianceReport(activeViolations.length, activeExceptions.length);
+    activeConstitutionRepository.addReport(report);
+    setConstitutionalReports(activeConstitutionRepository.getReportsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Constitutional Exception] GRANTED temporary exception for cp-evid-01 by Council. Compliance adjusted: ${report.overallScore}%.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1691,6 +1781,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧠 Meta-Cognitive Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringConstitution")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringConstitution"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            📜 Constitution Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -5006,6 +5106,184 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-600 italic">No reasoning episodes recorded in this session.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringConstitution" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">📜 ENGINEERING CONSTITUTION STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Enforce non-negotiable architectural invariants, audit planner outcomes compatibility, waiver exception rules, and track violations records</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerConstitutionalAudit}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Run Constitutional Audit
+                  </button>
+                  <button
+                    onClick={handleDeclareConstitutionalViolation}
+                    className="bg-red-900 hover:bg-red-800 text-red-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Declare Violation
+                  </button>
+                  <button
+                    onClick={handleGrantConstitutionalException}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Grant Exception
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Compliance Score Index */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Compliance Pillar Metrics</span>
+                  {constitutionalReports.length > 0 ? (
+                    (() => {
+                      const latest = constitutionalReports[constitutionalReports.length - 1];
+                      return (
+                        <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                          <div className="flex justify-between bg-slate-900 p-2 border border-slate-850 rounded">
+                            <span>Overall Compliance Score:</span>
+                            <strong className="text-cyan-300 text-xs">{latest.overallScore}%</strong>
+                          </div>
+                          <div className="flex justify-between mt-1">
+                            <span>Evidence Pillar:</span>
+                            <strong className="text-emerald-450">{latest.pillarScores.Evidence}%</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Safety Pillar:</span>
+                            <strong className="text-emerald-450">{latest.pillarScores.Safety}%</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Explainability Pillar:</span>
+                            <strong className="text-emerald-450">{latest.pillarScores.Explainability}%</strong>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      <div className="flex justify-between bg-slate-900 p-2 border border-slate-850 rounded">
+                        <span>Overall Compliance Score:</span>
+                        <strong className="text-cyan-300 text-xs">100%</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Constitutional Principles */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Engineering Constitutional Invariants Ledger</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {constitutionalPrinciples.map(p => (
+                      <div key={p.principleId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                        <div className="flex justify-between font-bold text-[8px] mb-1">
+                          <span className="text-cyan-300">{p.name} ({p.pillar})</span>
+                          <span className="text-slate-500">v{p.version} | {p.severity}</span>
+                        </div>
+                        <p className="text-[8px] text-slate-400">{p.rationale}</p>
+                        <p className="text-[7.5px] text-purple-400 mt-1">Enforcement: {p.enforcementRule}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Exception Rules summary */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Waiver Rules Limits</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Total Exceptions Active:</span>
+                      <strong className="text-cyan-300">{constitutionalExceptions.length}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Critical Safety Waiver:</span>
+                      <strong className="text-orange-400">Restricted</strong>
+                    </div>
+                    <div className="text-[7.5px] text-slate-500 border-t border-slate-900 pt-1.5 mt-1.5 leading-normal">
+                      Waivers bypass evidence validation routines under strict multi-agent council review consensus approvals.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Decisions, Violations, Exceptions lists */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Enforcement Decisions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Intercept Enforcement Decisions</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {constitutionalDecisions.length > 0 ? (
+                      [...constitutionalDecisions].reverse().map(dec => (
+                        <div key={dec.decisionId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Dec: {dec.decisionId}</span>
+                            <span className={`px-1.5 rounded text-[7px] ${
+                              dec.decisionStatus === "Authorized" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{dec.decisionStatus}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-500 truncate">Target: {dec.targetId}</p>
+                          <p className="text-[7.5px] text-slate-400 mt-1">{dec.evidenceSnippet}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No enforcement records yet. Run constitutional audit cycle.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Violations */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Constitutional Violations Registry</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {constitutionalViolations.length > 0 ? (
+                      [...constitutionalViolations].reverse().map(vio => (
+                        <div key={vio.violationId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal border-l-2 border-red-500">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-red-400">Violation: {vio.violationId}</span>
+                            <span className="px-1 rounded text-[7.5px] bg-red-950 text-red-400">{vio.status}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-200">Component: {vio.component}</p>
+                          <p className="text-[7.5px] text-slate-550 leading-normal mt-1 italic">"{vio.description}"</p>
+                          <p className="text-[7.5px] text-purple-400 mt-1 font-bold">Suggested Remedy: {vio.suggestedRemedy}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No violations active. Systems running within constitutional limits.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Exceptions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">6. Active Exception Waivers list</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {constitutionalExceptions.length > 0 ? (
+                      [...constitutionalExceptions].reverse().map(exc => (
+                        <div key={exc.exceptionId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal border-l-2 border-purple-500">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-purple-400">Waiver: {exc.exceptionId}</span>
+                            <span className="text-slate-500">Approved by Council</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-400">Justification: "{exc.justification}"</p>
+                          <p className="text-[7px] text-slate-500 mt-1">Expires: {exc.expiryTimestamp}</p>
+                          <a href={exc.auditLink} className="text-purple-450 hover:underline text-[7px] block mt-1">Audit Constitution Link</a>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No active exceptions waiving compliance checks.</span>
                     )}
                   </div>
                 </div>
