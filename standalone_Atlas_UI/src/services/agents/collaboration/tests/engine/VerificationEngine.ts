@@ -17,6 +17,7 @@ import { activeCouncilVerificationContributor } from "../../../../intelligence/v
 import { activeMemoryVerificationContributor } from "../../../../intelligence/verification/MemoryVerificationContributor";
 import { activeDecisionVerificationContributor } from "../../../../intelligence/verification/DecisionVerificationContributor";
 import { activeRuntimeVerificationContributor } from "../../../../intelligence/verification/RuntimeVerificationContributor";
+import { activeGovernanceVerificationContributor } from "../../../../intelligence/verification/GovernanceVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -77,6 +78,10 @@ export class VerificationEngine {
     // Evaluate Continuous Twin Intelligence checks
     const runtimeAsserts = activeRuntimeVerificationContributor.verifyRuntimeEcosystem();
     runtimeAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Autonomous Policy & Governance Engine checks
+    const governanceAsserts = activeGovernanceVerificationContributor.verifyGovernanceEcosystem();
+    governanceAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

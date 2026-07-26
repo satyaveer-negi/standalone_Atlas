@@ -122,6 +122,12 @@ import { activeEngineeringHeartbeat } from "../../services/intelligence/runtime/
 import { activeNotificationCoordinator } from "../../services/intelligence/runtime/NotificationCoordinator";
 import type { EngineeringSituation } from "../../services/intelligence/runtime/EngineeringSituation";
 import type { CorrelatedSituation } from "../../services/intelligence/runtime/CorrelatedSituation";
+import { activeOperationalGovernance } from "../../services/intelligence/governance/OperationalGovernance";
+import { activeEngineeringActionRepository } from "../../services/intelligence/repository/EngineeringActionRepository";
+import { activeApprovalWorkflow } from "../../services/intelligence/governance/ApprovalWorkflow";
+import type { EngineeringAction } from "../../services/intelligence/governance/EngineeringAction";
+import type { GovernanceDecision } from "../../services/intelligence/governance/GovernanceDecision";
+import type { GovernanceEvent } from "../../services/intelligence/governance/GovernanceEvent";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -155,6 +161,7 @@ type ActiveWorkspace =
   | "memoryStudio"
   | "decisionStudio"
   | "twinContinuous"
+  | "operationalGovernance"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -274,6 +281,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [correlatedSituations, setCorrelatedSituations] = useState<CorrelatedSituation[]>([]);
   const [anomalyTriggered, setAnomalyTriggered] = useState(false);
   const [heartbeatTicks, setHeartbeatTicks] = useState(0);
+  const [governedActions, setGovernedActions] = useState<EngineeringAction[]>([]);
+  const [governedDecisions, setGovernedDecisions] = useState<GovernanceDecision[]>([]);
+  const [governedEvents, setGovernedEvents] = useState<GovernanceEvent[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1168,6 +1178,79 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     });
   };
 
+  const handleCompileOperationalGovernance = () => {
+    if (situations.length === 0) {
+      setMockLogs(prev => [
+        ...prev,
+        `[Operational Governance] Error: Cannot govern. Active situations list is empty. Run heartbeat telemetry first.`
+      ]);
+      return;
+    }
+
+    const latestSit = situations[situations.length - 1];
+    const { action, decision } = activeOperationalGovernance.govern(latestSit, activeRecommendation);
+
+    activeEngineeringActionRepository.saveAction(action);
+    activeEngineeringActionRepository.saveDecision(decision);
+
+    const evt: GovernanceEvent = {
+      eventId: `gev-${Date.now()}`,
+      eventType: "ComplianceAudited",
+      relatedActionId: action.actionId,
+      policyVersion: decision.policyEvaluated.version,
+      actor: "System Authorizer",
+      beforeState: "Draft",
+      afterState: action.status,
+      evidenceLink: decision.complianceReport.evidenceSnapshot,
+      correlationId: latestSit.id,
+      timestamp: new Date().toISOString()
+    };
+
+    activeEngineeringActionRepository.addEvent(evt);
+
+    setGovernedActions(activeEngineeringActionRepository.getActionsList());
+    setGovernedDecisions(activeEngineeringActionRepository.getDecisionsList());
+    setGovernedEvents(activeEngineeringActionRepository.getEventsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Operational Governance] Evaluated policy compliance for action ${action.actionId}. Status: ${action.status}`
+    ]);
+  };
+
+  const handleApproveGovernedAction = (actionId: string) => {
+    const list = activeEngineeringActionRepository.getActionsList();
+    const action = list.find(a => a.actionId === actionId);
+
+    if (action) {
+      activeApprovalWorkflow.grantApproval(action, "HP (Chief Architect)");
+      activeEngineeringActionRepository.saveAction(action);
+
+      const evt: GovernanceEvent = {
+        eventId: `gev-${Date.now()}`,
+        eventType: "AuthorizationGranted",
+        relatedActionId: action.actionId,
+        policyVersion: action.governingPolicies[0]?.version || 1,
+        actor: "HP (Chief Architect)",
+        beforeState: "Pending",
+        afterState: "Approved",
+        evidenceLink: "Operator signoff workflow verification complete",
+        correlationId: action.triggerSituation.id,
+        timestamp: new Date().toISOString()
+      };
+
+      activeEngineeringActionRepository.addEvent(evt);
+
+      setGovernedActions(activeEngineeringActionRepository.getActionsList());
+      setGovernedEvents(activeEngineeringActionRepository.getEventsList());
+
+      setMockLogs(prev => [
+        ...prev,
+        `[Governance Approval] Human approval chain signed by HP. Action ${action.actionId} state marked APPROVED.`
+      ]);
+    }
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1401,6 +1484,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🌍 Continuous Twin Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("operationalGovernance")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "operationalGovernance"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🛡️ Operational Governance
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -4054,6 +4147,190 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-600 italic">No operator alerts dispatched.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "operationalGovernance" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🛡️ OPERATIONAL GOVERNANCE & COMPLIANCE ENGINE</h3>
+                  <p className="text-[10px] text-slate-500">Govern proposed operational adjustments, enforce safety interlock controls, audit compliances, and manage operator sign-offs</p>
+                </div>
+                <div>
+                  <button
+                    onClick={handleCompileOperationalGovernance}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Govern Telemetry Situation
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Policy Management */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Policy Management</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <span className="text-[8.5px] font-bold text-slate-200">Active Policy ID:</span>
+                    <span className="text-cyan-300 block truncate">gov-policy-v4.5-nominal</span>
+                    <div className="flex justify-between mt-1">
+                      <span>Approver Level:</span>
+                      <strong className="text-purple-300">Lead</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Approval Type:</span>
+                      <strong className="text-purple-300">Hybrid</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Version:</span>
+                      <strong className="text-cyan-300">1 (Nominal)</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Compliance Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Compliance Dashboard</span>
+                  {governedActions.length > 0 ? (
+                    (() => {
+                      const latest = governedActions[governedActions.length - 1];
+                      return (
+                        <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                          <div className="flex justify-between">
+                            <span>Constitutional:</span>
+                            <span className="text-emerald-400 font-bold">Passed</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Safety Audits:</span>
+                            <span className={latest.complianceReport?.safetyStatus === "Passed" ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
+                              {latest.complianceReport?.safetyStatus}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Regulatory:</span>
+                            <span className="text-emerald-400 font-bold">Passed</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-500 mt-2 truncate">
+                            Evidence: {latest.complianceReport?.evidenceSnapshot}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">Run governance compiler.</span>
+                  )}
+                </div>
+
+                {/* 3. Safety Interlocks */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Safety Interlocks</span>
+                  {governedDecisions.length > 0 ? (
+                    (() => {
+                      const latestDec = governedDecisions[governedDecisions.length - 1];
+                      const isEngaged = latestDec.safetyConstraintsChecked.some(c => c.includes("Safety Interlock Engaged"));
+                      return (
+                        <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                          <div className="flex justify-between items-center bg-slate-900 p-2 border border-slate-850 rounded">
+                            <span>Interlock Engaged:</span>
+                            <strong className={isEngaged ? "text-red-400 font-bold text-xs" : "text-emerald-400 font-bold"}>
+                              {isEngaged ? "TRUE" : "FALSE"}
+                            </strong>
+                          </div>
+                          <div className="text-[7.5px] text-slate-500 leading-normal mt-1">
+                            {latestDec.safetyConstraintsChecked[0] || "Safety checks normal."}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">No interlocks recorded.</span>
+                  )}
+                </div>
+
+                {/* 4. Governance Metrics */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Governance Quality Metrics</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Approval Latency:</span>
+                      <strong className="text-cyan-300">{(activeEngineeringActionRepository.getMetrics().approvalLatencyMs / 1000).toFixed(0)}s</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Compliance Rate:</span>
+                      <strong className="text-cyan-300">{activeEngineeringActionRepository.getMetrics().complianceRatePercent}%</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Interlock Incidents:</span>
+                      <strong className="text-cyan-300">{activeEngineeringActionRepository.getMetrics().safetyInterlockCount}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Rollback Frequency:</span>
+                      <strong className="text-cyan-300">{activeEngineeringActionRepository.getMetrics().rollbackRatePercent}%</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Approval workflow queue and audit events timeline */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Operational Action Approval Queue</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {governedActions.length > 0 ? (
+                      [...governedActions].reverse().map(act => (
+                        <div key={act.actionId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Action ID: {act.actionId}</span>
+                            <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                              <span>Chain Status: {act.approvalChain?.chainStatus}</span>
+                              <span>Target Load: {act.executionIntent?.executionParameters.targetLoadKW}kW</span>
+                              <span>Rollback: {act.rollbackPlanText}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {act.status === "Pending" && (
+                              <button
+                                onClick={() => handleApproveGovernedAction(act.actionId)}
+                                className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-2 py-0.5 rounded text-[8px] cursor-pointer"
+                              >
+                                Sign-off HP
+                              </button>
+                            )}
+                            <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                              act.status === "Approved" ? "bg-emerald-950 text-emerald-450" : "bg-slate-950 text-slate-400"
+                            }`}>{act.status}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No actions registered in the approval queue.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">6. Governed Audit Events Ledger</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {governedEvents.length > 0 ? (
+                      [...governedEvents].reverse().map((evt, idx) => (
+                        <div key={idx} className="bg-slate-900 p-2 border border-slate-850 rounded text-slate-400 leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-purple-400">{evt.eventType}</span>
+                            <span className="text-slate-500">{new Date(evt.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-[8px]">Actor: {evt.actor} | Action: {evt.relatedActionId} | State: {evt.beforeState} &rarr; {evt.afterState}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No governance events logged in this session.</span>
                     )}
                   </div>
                 </div>
