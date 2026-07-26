@@ -15,6 +15,7 @@ import { activeIntentVerificationContributor } from "../../../../intelligence/ve
 import { activePlanningVerificationContributor } from "../../../../intelligence/verification/PlanningVerificationContributor";
 import { activeCouncilVerificationContributor } from "../../../../intelligence/verification/CouncilVerificationContributor";
 import { activeMemoryVerificationContributor } from "../../../../intelligence/verification/MemoryVerificationContributor";
+import { activeDecisionVerificationContributor } from "../../../../intelligence/verification/DecisionVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -67,6 +68,10 @@ export class VerificationEngine {
     // Evaluate Engineering Memory & Organizational Learning checks
     const memoryAsserts = activeMemoryVerificationContributor.verifyMemoryEcosystem();
     memoryAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Decision Intelligence checks
+    const decisionAsserts = activeDecisionVerificationContributor.verifyDecisionEcosystem();
+    decisionAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

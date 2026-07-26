@@ -108,6 +108,10 @@ import { activeLessonsLearned } from "../../services/intelligence/memory/Lessons
 import { activeRecommendationLearner } from "../../services/intelligence/memory/RecommendationLearner";
 import { activeDecisionHistory } from "../../services/intelligence/memory/DecisionHistory";
 import { activeEngineeringMemoryRepository } from "../../services/intelligence/repository/EngineeringMemoryRepository";
+import { activeDecisionIntelligence } from "../../services/intelligence/decision/DecisionIntelligence";
+import { activeDecisionRepository } from "../../services/intelligence/repository/DecisionRepository";
+import { activeDecisionExplanationEngine } from "../../services/intelligence/decision/DecisionExplanationEngine";
+import type { EngineeringRecommendation } from "../../services/intelligence/decision/EngineeringRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -139,6 +143,7 @@ type ActiveWorkspace =
   | "planningStudio"
   | "councilChamber"
   | "memoryStudio"
+  | "decisionStudio"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -253,6 +258,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeDecision, setActiveDecision] = useState<EngineeringDecision | null>(null);
   const [synthesizedRec, setSynthesizedRec] = useState<any>(null);
   const [experienceLogs, setExperienceLogs] = useState<any[]>([]);
+  const [activeRecommendation, setActiveRecommendation] = useState<EngineeringRecommendation | null>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1078,6 +1084,35 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleFormulateDecisionAdvice = () => {
+    if (!activeIntent) {
+      setIntentValidationLogs("Error: You must parse and validate an intent goal before formulating advice.");
+      return;
+    }
+    const rec = activeDecisionIntelligence.formulateAdvice(activeIntent, planningResult);
+    activeDecisionRepository.saveRecommendation(rec);
+    setActiveRecommendation(rec);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Decision Intelligence] Compiled recommendation ID ${rec.id} (Confidence: ${rec.overallConfidenceScore}%).`
+    ]);
+  };
+
+  const handleApproveDecisionRecommendation = () => {
+    if (!activeRecommendation) return;
+    
+    const topCand = activeRecommendation.planningResult?.candidates[0] || null;
+    if (topCand) {
+      handleLoadPlanIntoWorkflowStudio(topCand);
+    }
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Decision Board] Governed Engineering Recommendation ID ${activeRecommendation.id} approved by HP (Chief Architect).`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1291,6 +1326,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             💾 Engineering Memory Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("decisionStudio")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "decisionStudio"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧠 Decision Intelligence Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -3613,6 +3658,148 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "decisionStudio" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧠 DECISION INTELLIGENCE STUDIO & GOVERNED RECOMMENDATIONS</h3>
+                  <p className="text-[10px] text-slate-500">Transform historical experiences patterns and multi-criteria evaluations outcomes into confidence-scored, auditable engineering advice</p>
+                </div>
+                <div className="flex gap-2">
+                  {activeIntent ? (
+                    <button
+                      onClick={handleFormulateDecisionAdvice}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                    >
+                      Formulate Recommendation
+                    </button>
+                  ) : (
+                    <span className="text-red-400 text-[10px] font-bold">Please validate an intent first.</span>
+                  )}
+                  {activeRecommendation && (
+                    <button
+                      onClick={handleApproveDecisionRecommendation}
+                      className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                    >
+                      Approve & Load Design
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                {/* Panel 1: Advice Summary & Predicted Outcomes */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Recommended Plan & Forecasted Outcome</span>
+                  {activeRecommendation ? (
+                    <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-300">
+                      <p className="text-slate-200 italic leading-relaxed">{activeRecommendation.recommendationSummary}</p>
+                      <div className="border-t border-slate-900 pt-2 flex flex-col gap-1.5 mt-1">
+                        <span className="text-cyan-350 block font-bold text-[8.5px]">Outcome Forecasts:</span>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Predicted Speed:</span>
+                          <strong className="text-cyan-300">{(activeRecommendation.predictedOutcome.predictedDurationMs / 1000).toFixed(0)}s</strong>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Predicted Cost:</span>
+                          <strong className="text-cyan-300">${activeRecommendation.predictedOutcome.predictedCostUSD}</strong>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Peak GPU/CPU:</span>
+                          <strong className="text-cyan-300">{activeRecommendation.predictedOutcome.predictedCpuUsagePercent}%</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">No recommendations formulated. Trigger recommendation engine.</span>
+                  )}
+                </div>
+
+                {/* Panel 2: Tradeoffs & Confidence Analysis */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Tradeoff Explorer & Confidence analysis</span>
+                  {activeRecommendation ? (
+                    <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                      <div className="flex justify-between items-center bg-slate-900 p-2 border border-slate-850 rounded">
+                        <span>Confidence Score:</span>
+                        <strong className="text-emerald-450 text-xs font-bold">{activeRecommendation.overallConfidenceScore}%</strong>
+                      </div>
+                      <div className="flex justify-between text-slate-500 mt-2">
+                        <span>Pareto Efficiency Index:</span>
+                        <strong className="text-purple-300">{activeRecommendation.tradeoffs.efficiencyIndex}%</strong>
+                      </div>
+                      <div className="flex justify-between text-slate-500">
+                        <span>Cost-to-Accuracy Ratio:</span>
+                        <strong className="text-purple-300">{activeRecommendation.tradeoffs.costAccuracyRatio.toFixed(1)}</strong>
+                      </div>
+                      <div className="text-[7.5px] text-slate-500 border-t border-slate-900 pt-2 leading-normal mt-2">
+                        <strong>Confidence criteria weights:</strong> Derived dynamically from historical project successes and specialists agreement coverage.
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">Tradeoff details populate upon advice execution.</span>
+                  )}
+                </div>
+
+                {/* Panel 3: Risk Forecast Indicator */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Execution Risk Forecasts</span>
+                  <div className="max-h-[140px] overflow-y-auto flex flex-col gap-2 mt-1 leading-tight">
+                    {activeRecommendation ? (
+                      activeRecommendation.riskForecasts.map((rk, idx) => (
+                        <div key={idx} className="border-b border-slate-900 pb-1.5 last:border-0 last:pb-0">
+                          <div className="flex justify-between text-[8.5px] font-bold text-slate-200">
+                            <span>Risk Category: {rk.category}</span>
+                            <span className="text-yellow-450">Prob: {rk.probabilityPercent}%</span>
+                          </div>
+                          <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                            <span>Severity Score: {rk.severityScore}/10</span>
+                          </div>
+                          <p className="text-slate-400 text-[8px] mt-1 leading-normal">
+                            <strong>Mitigation Plan:</strong> {rk.mitigationAdvice}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No risks forecasted.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Rationale Trace Explorer */}
+              {activeRecommendation && (
+                <div className="grid grid-cols-1 gap-4 text-[9px] font-mono mt-2 bg-slate-905 border border-slate-800 rounded p-2.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Governed Decision Rationale & Trace Evidence Chain</span>
+                  <div className="grid grid-cols-2 gap-4 mt-1">
+                    <div>
+                      <span className="text-cyan-400 block font-bold text-[8.5px] border-b border-slate-900 pb-0.5">Explanation Evidence Chain</span>
+                      <div className="flex flex-col gap-1 mt-1 text-[8px] text-slate-400 leading-tight">
+                        {activeDecisionExplanationEngine.traceDecision(activeRecommendation).evidenceChain.map((ev, idx) => (
+                          <div key={idx} className="border-b border-slate-900 pb-0.5 last:border-0">
+                            &bull; {ev}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="border-l border-slate-850 pl-3 leading-tight text-slate-400">
+                      <span className="text-purple-300 block font-bold text-[8.5px] border-b border-slate-900 pb-0.5">Core Decision Justification</span>
+                      <p className="mt-1 leading-relaxed italic text-slate-200">
+                        &ldquo;{activeDecisionExplanationEngine.traceDecision(activeRecommendation).justification}&rdquo;
+                      </p>
+                      <div className="text-[7.5px] text-slate-500 mt-2">
+                        Trace ID: {activeRecommendation.explanationTraceId} | Status: Governed & Auditable
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
