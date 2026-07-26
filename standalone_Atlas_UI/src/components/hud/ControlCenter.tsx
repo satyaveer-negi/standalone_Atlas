@@ -128,6 +128,15 @@ import { activeApprovalWorkflow } from "../../services/intelligence/governance/A
 import type { EngineeringAction } from "../../services/intelligence/governance/EngineeringAction";
 import type { GovernanceDecision } from "../../services/intelligence/governance/GovernanceDecision";
 import type { GovernanceEvent } from "../../services/intelligence/governance/GovernanceEvent";
+import { activeEngineeringKnowledgeSynthesis } from "../../services/intelligence/synthesis/EngineeringKnowledgeSynthesis";
+import { activeOperationalOutcomeRepository } from "../../services/intelligence/repository/OperationalOutcomeRepository";
+import { activePlaybookGenerator } from "../../services/intelligence/synthesis/PlaybookGenerator";
+import { activePatternRefiner } from "../../services/intelligence/synthesis/PatternRefiner";
+import { activePolicyEffectivenessEvaluator } from "../../services/intelligence/synthesis/PolicyEffectivenessEvaluator";
+import { activeCrossDomainSynthesizer } from "../../services/intelligence/synthesis/CrossDomainSynthesizer";
+import type { OperationalOutcome } from "../../services/intelligence/synthesis/OperationalOutcome";
+import type { KnowledgeArtifact } from "../../services/intelligence/synthesis/KnowledgeArtifact";
+import type { SynthesisSession } from "../../services/intelligence/synthesis/SynthesisSession";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -162,6 +171,7 @@ type ActiveWorkspace =
   | "decisionStudio"
   | "twinContinuous"
   | "operationalGovernance"
+  | "knowledgeSynthesis"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -284,6 +294,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [governedActions, setGovernedActions] = useState<EngineeringAction[]>([]);
   const [governedDecisions, setGovernedDecisions] = useState<GovernanceDecision[]>([]);
   const [governedEvents, setGovernedEvents] = useState<GovernanceEvent[]>([]);
+  const [operationalOutcomes, setOperationalOutcomes] = useState<OperationalOutcome[]>([]);
+  const [knowledgeArtifacts, setKnowledgeArtifacts] = useState<KnowledgeArtifact[]>([]);
+  const [synthesisSessions, setSynthesisSessions] = useState<SynthesisSession[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1251,6 +1264,63 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     }
   };
 
+  const handleCompileKnowledgeSynthesis = () => {
+    if (governedActions.length === 0) {
+      setMockLogs(prev => [
+        ...prev,
+        `[Knowledge Synthesis] Error: No governed actions recorded. Compile operational governance first.`
+      ]);
+      return;
+    }
+
+    const latestAct = governedActions[governedActions.length - 1];
+    
+    // Simulate execution outcome transition
+    const out: OperationalOutcome = {
+      outcomeId: `out-${Date.now()}`,
+      action: latestAct,
+      intent: latestAct.executionIntent || {
+        intentId: `mock-intent-${Date.now()}`,
+        actionId: latestAct.actionId,
+        executionParameters: {},
+        timeoutMs: 30000,
+        retriesAllowed: 3,
+        rollbackTriggerConditions: [],
+        verificationCriteria: []
+      },
+      executionResultStatus: "Success",
+      verificationResultSummary: "Nominal converter operating temperatures verified compliant",
+      kpiChanges: {
+        latencyReductionMs: 140,
+        safetyComplianceScore: 99.4
+      },
+      safetyImpact: "Passed",
+      resourceUsage: {
+        cpuSeconds: 12,
+        peakMemoryMb: 92
+      },
+      policyCompliancePassed: true,
+      lessonsLearnedId: null,
+      confidenceScore: 96,
+      timestamp: new Date().toISOString()
+    };
+
+    activeOperationalOutcomeRepository.saveOutcome(out);
+
+    const { artifact, session } = activeEngineeringKnowledgeSynthesis.runSynthesis([out], ["Solar"]);
+    activeOperationalOutcomeRepository.saveArtifact(artifact);
+    activeOperationalOutcomeRepository.saveSession(session);
+
+    setOperationalOutcomes(activeOperationalOutcomeRepository.getOutcomesList());
+    setKnowledgeArtifacts(activeOperationalOutcomeRepository.getArtifactsList());
+    setSynthesisSessions(activeOperationalOutcomeRepository.getSessionsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Knowledge Synthesis] Synthesized outcome successfully. Created Knowledge Artifact ID ${artifact.artifactId} (Confidence: ${artifact.confidenceScore}%).`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1494,6 +1564,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🛡️ Operational Governance
+          </button>
+          <button
+            onClick={() => setActiveTab("knowledgeSynthesis")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "knowledgeSynthesis"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            📚 Knowledge Synthesis
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -4331,6 +4411,184 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-600 italic">No governance events logged in this session.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "knowledgeSynthesis" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">📚 ENGINEERING KNOWLEDGE SYNTHESIS STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Synthesize operational outcomes, extract cross-domain engineering patterns, evaluate policy effectiveness, and compile reusable playbooks</p>
+                </div>
+                <div>
+                  <button
+                    onClick={handleCompileKnowledgeSynthesis}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Synthesize Playbooks & Recommendations
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Policy Recommendations */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Policy Recommendations</span>
+                  <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                    {knowledgeArtifacts.length > 0 ? (
+                      knowledgeArtifacts.map(art => (
+                        <div key={art.artifactId} className="bg-slate-900 p-2 border border-slate-850 rounded">
+                          <span className="font-bold text-slate-200">Recommendation:</span>
+                          <p className="text-orange-400 text-[8px] mt-1 leading-normal">
+                            {art.derivedPatterns[0]}
+                          </p>
+                          <div className="flex justify-between text-[7px] text-slate-500 mt-2">
+                            <span>Artifact: {art.artifactId}</span>
+                            <span>Confidence: {art.confidenceScore}%</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-slate-900 p-2 border border-slate-850 rounded">
+                        <span className="font-bold text-slate-250">Proposed Policy Refinement:</span>
+                        <p className="text-slate-500 text-[8px] mt-1 leading-normal italic">
+                          "Lower nominal solar voltage check triggers from 120V to 118V to prevent switcher degradation."
+                        </p>
+                        <div className="flex justify-between text-[7px] text-slate-500 mt-2">
+                          <span>Confidence: 92%</span>
+                          <span>Source: Simulation Failures</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Operational Outcomes */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Operational Outcomes</span>
+                  {operationalOutcomes.length > 0 ? (
+                    (() => {
+                      const latest = operationalOutcomes[operationalOutcomes.length - 1];
+                      return (
+                        <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                          <div className="flex justify-between">
+                            <span>Status:</span>
+                            <span className="text-emerald-400 font-bold">{latest.executionResultStatus}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Latency Reduction:</span>
+                            <span className="text-cyan-300 font-bold">{latest.kpiChanges.latencyReductionMs}ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Compliance Score:</span>
+                            <span className="text-cyan-300 font-bold">{latest.kpiChanges.safetyComplianceScore}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Peak Memory:</span>
+                            <span className="text-slate-500">{latest.resourceUsage.peakMemoryMb}MB</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-500 mt-1 truncate">
+                            Evidence: {latest.verificationResultSummary}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">Run synthesis compiler.</span>
+                  )}
+                </div>
+
+                {/* 3. Cross-Domain Patterns */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Cross-Domain Patterns</span>
+                  <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                    <div className="bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span className="font-bold text-slate-200 block truncate">Standardized Transient Limits</span>
+                      <div className="flex gap-1.5 text-slate-500 text-[7.5px] mt-1">
+                        <span>Domains: Solar, Wind, CFD</span>
+                      </div>
+                      <p className="text-slate-400 text-[8px] mt-1 leading-normal italic">
+                        "Enforce preventive safety bounds audits during startup sequences."
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Synthesis Analytics */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Synthesis Analytics</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Total Outcomes:</span>
+                      <strong className="text-cyan-300">{operationalOutcomes.length}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Synthesized Session:</span>
+                      <strong className="text-cyan-300 truncate max-w-[80px]">{synthesisSessions[0]?.sessionId || "None"}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Synthesis Duration:</span>
+                      <strong className="text-cyan-300">42ms</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Policy Effectiveness:</span>
+                      <strong className="text-emerald-400">Stable ({activePolicyEffectivenessEvaluator.evaluate(operationalOutcomes).overallComplianceRate}%)</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Generated Engineering Playbooks list and Knowledge Artifacts */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Generated Reusable Engineering Playbooks</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {(() => {
+                      const playbooks = activePlaybookGenerator.generate(operationalOutcomes);
+                      return playbooks.map(pb => (
+                        <div key={pb.playbookId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">{pb.name}</span>
+                            <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                              <span>Domain: {pb.targetDomain}</span>
+                              <span>Steps: {pb.steps.length} steps</span>
+                            </div>
+                            <div className="text-[7.5px] text-purple-400 mt-1 leading-normal font-sans">
+                              {pb.steps.join(" → ")}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="px-1.5 py-0.5 rounded text-[8px] bg-slate-950 text-cyan-400 border border-cyan-900/50">
+                              Successes: {pb.successCount}
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">6. Canonical Knowledge Artifacts</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {knowledgeArtifacts.length > 0 ? (
+                      [...knowledgeArtifacts].reverse().map(art => (
+                        <div key={art.artifactId} className="bg-slate-900 p-2 border border-slate-850 rounded text-slate-400 leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Artifact: {art.artifactId}</span>
+                            <span className="text-slate-500">v{art.version}</span>
+                          </div>
+                          <p className="text-[8px] truncate">Domains: {art.applicableDomains.join(", ")}</p>
+                          <p className="text-[8px] mt-1 text-slate-500">Author: {art.author} | Evidence: {art.supportingEvidenceCount} outcomes</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No canonical artifacts synthesized yet.</span>
                     )}
                   </div>
                 </div>
