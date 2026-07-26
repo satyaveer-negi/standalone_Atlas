@@ -164,6 +164,11 @@ import { activeTrustRepository } from "../../services/intelligence/repository/Tr
 import type { KnowledgeTrustRecord } from "../../services/intelligence/trust/KnowledgeTrustRecord";
 import type { ProvenanceCustodyNode } from "../../services/intelligence/trust/ProvenanceTracker";
 import type { TrustMetrics } from "../../services/intelligence/repository/TrustRepository";
+import { activeAssuranceRepository } from "../../services/intelligence/repository/AssuranceRepository";
+import type { AssuranceCase } from "../../services/intelligence/assurance/AssuranceCase";
+import type { CertificationPackage } from "../../services/intelligence/assurance/CertificationPackage";
+import type { CertificationDecision } from "../../services/intelligence/assurance/CertificationDecision";
+import type { CertificationAuthority } from "../../services/intelligence/assurance/CertificationAuthority";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -343,6 +348,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [trustRecords, setTrustRecords] = useState<KnowledgeTrustRecord[]>([]);
   const [trustHops, setTrustHops] = useState<ProvenanceCustodyNode[]>([]);
   const [trustMetrics, setTrustMetrics] = useState<TrustMetrics>(activeTrustRepository.getMetrics());
+  const [assuranceCases, setAssuranceCases] = useState<AssuranceCase[]>([]);
+  const [certificationPackages, setCertificationPackages] = useState<CertificationPackage[]>([]);
+  const [certificationDecisions, setCertificationDecisions] = useState<CertificationDecision[]>([]);
+  const [certificationAuthorities, setCertificationAuthorities] = useState<CertificationAuthority[]>(activeAssuranceRepository.getAuthoritiesList());
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1578,6 +1587,106 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setMockLogs(prev => [
       ...prev,
       `[CRITICAL TRUST ALERT] Integrity check FAILED for artifact ${latest.artifactId}! Trust score revoked to 0%. Security interlocks engaged.`
+    ]);
+  };
+
+  const handleCompileAssuranceCase = () => {
+    // 1. Compile Assurance Case
+    const caseId = `case-${Date.now()}`;
+    const ac: AssuranceCase = {
+      caseId,
+      targetArtifactId: "mock-art-trust-01",
+      claimText: "Turbine blade design mesh calculation margins verified safe for simulation and testing.",
+      evidenceIds: ["ktr-mock-art-trust-01", "compliance-p1"],
+      assuranceScore: 98,
+      reviewStatus: "Certified",
+      scope: "Simulation",
+      validityPeriod: {
+        startDate: new Date().toISOString(),
+        expiryDate: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString() // 1 year
+      },
+      timestamp: new Date().toISOString()
+    };
+    activeAssuranceRepository.saveCase(ac);
+
+    // 2. Compile Certification Package
+    const packageId = `pkg-${Date.now()}`;
+    const cp: CertificationPackage = {
+      packageId,
+      caseId,
+      verificationSummary: "Passed all automated Pillar 1 compliance simulation suite assertions.",
+      trustRecordVersionId: "ktr-v1-ref",
+      complianceVerificationVersionId: "ccr-v1-ref",
+      validUntilDate: ac.validityPeriod.expiryDate
+    };
+    activeAssuranceRepository.savePackage(cp);
+
+    // 3. Compile Certification Decision signed by Compliance Officer
+    const decisionId = `dec-cert-${Date.now()}`;
+    const cd: CertificationDecision = {
+      decisionId,
+      packageId,
+      status: "Approved",
+      rationale: "Safety margins validated. Cryptographic provenance verified successfully.",
+      approverSignature: "sig-key-compliance-officer-rsa",
+      decisionVersion: 1,
+      supersedesDecisionId: null,
+      timestamp: new Date().toISOString()
+    };
+    activeAssuranceRepository.saveDecision(cd);
+
+    // Refresh UI States
+    setAssuranceCases(activeAssuranceRepository.getCasesList());
+    setCertificationPackages(activeAssuranceRepository.getPackagesList());
+    setCertificationDecisions(activeAssuranceRepository.getDecisionsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Assurance Case] Compiled case ${ac.caseId} (Scope: ${ac.scope}). Package ${cp.packageId} certified by Compliance Officer. Decision: ${cd.status}.`
+    ]);
+  };
+
+  const handleSuspendCertification = () => {
+    if (certificationDecisions.length === 0) {
+      setMockLogs(prev => [...prev, `[Assurance Alert] Error: No active certification decisions to suspend.`]);
+      return;
+    }
+
+    const latest = certificationDecisions[certificationDecisions.length - 1];
+    const supersedesId = latest.decisionId;
+
+    // Create a new version of the decision marking it Suspended
+    const cd: CertificationDecision = {
+      decisionId: `dec-cert-susp-${Date.now()}`,
+      packageId: latest.packageId,
+      status: "Suspended",
+      rationale: "Safety override interlock triggered by operator or telemetry threshold drift warnings.",
+      approverSignature: "sig-key-automated-sha256",
+      decisionVersion: latest.decisionVersion + 1,
+      supersedesDecisionId: supersedesId,
+      timestamp: new Date().toISOString()
+    };
+    activeAssuranceRepository.saveDecision(cd);
+
+    // Also update reviewStatus of the associated AssuranceCase
+    const pkgs = activeAssuranceRepository.getPackagesList();
+    const pkg = pkgs.find(p => p.packageId === latest.packageId);
+    if (pkg) {
+      const casesList = activeAssuranceRepository.getCasesList();
+      const acCase = casesList.find(c => c.caseId === pkg.caseId);
+      if (acCase) {
+        acCase.reviewStatus = "Revoked";
+        activeAssuranceRepository.saveCase(acCase);
+      }
+    }
+
+    // Refresh UI States
+    setAssuranceCases(activeAssuranceRepository.getCasesList());
+    setCertificationDecisions(activeAssuranceRepository.getDecisionsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Assurance Revocation] SUSPENDED certification package ${latest.packageId}. New decision version ${cd.decisionVersion} logged. Status: Revoked.`
     ]);
   };
 
@@ -5506,6 +5615,143 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     <div className="bg-slate-900 p-2 border border-slate-850 rounded">
                       <span className="font-bold text-emerald-400 block mb-0.5">INTEGRITY CHECK PASSED</span>
                       <span>Artifact hashes matched the signed genesis block configuration.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringAssurance" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🎖️ ENGINEERING ASSURANCE & CERTIFICATION STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Compile operational suitability arguments, link immutable verification reports, delegate authority approvals, and track active certificates lifecycles</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCompileAssuranceCase}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Compile Assurance Case
+                  </button>
+                  <button
+                    onClick={handleSuspendCertification}
+                    className="bg-red-900 hover:bg-red-800 text-red-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Suspend Certification
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Assurance Cases list */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Structured Suitability Claims (Assurance Cases)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {assuranceCases.length > 0 ? (
+                      [...assuranceCases].reverse().map(ac => (
+                        <div key={ac.caseId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Case: {ac.caseId} (Target: {ac.targetArtifactId})</span>
+                            <span className={`px-1.5 rounded text-[7px] font-bold ${
+                              ac.reviewStatus === "Certified" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{ac.reviewStatus}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-200">Claim: "{ac.claimText}"</p>
+                          <div className="flex justify-between text-slate-550 text-[7.5px] mt-1">
+                            <span>Evidence linked: {ac.evidenceIds.length} records</span>
+                            <span>Scope: <strong className="text-purple-300">{ac.scope}</strong></span>
+                            <span>Assurance Index: <strong className="text-cyan-300">{ac.assuranceScore}%</strong></span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No suitability cases registered. Trigger Compile Assurance Case.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Certification Packages */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Reusable Certification Packages</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {certificationPackages.length > 0 ? (
+                      [...certificationPackages].reverse().map(pkg => (
+                        <div key={pkg.packageId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <span className="font-bold text-slate-300 block text-[8px]">Pkg: {pkg.packageId}</span>
+                          <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                            <div>Trust Ref: {pkg.trustRecordVersionId}</div>
+                            <div>Compliance Ref: {pkg.complianceVerificationVersionId}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No packages compiled.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Authorities Registry */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Authorized Review Boards</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {certificationAuthorities.map(auth => (
+                      <div key={auth.authorityId} className="bg-slate-900 p-1.5 border border-slate-850 rounded leading-normal">
+                        <span className="font-bold text-slate-200 block truncate">{auth.name}</span>
+                        <div className="flex justify-between text-slate-550 text-[7px] mt-0.5">
+                          <span>Role: {auth.role}</span>
+                          <span>Key: {auth.signatureKey.substring(8, 16)}...</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Decisions and audit timelines */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Decisions Ledger */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Certification Decisions Ledger (History)</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {certificationDecisions.length > 0 ? (
+                      [...certificationDecisions].reverse().map(dec => (
+                        <div key={dec.decisionId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Dec: {dec.decisionId} (Pkg: {dec.packageId})</span>
+                            <p className="text-[7.5px] text-slate-500 mt-1 leading-normal">Rationale: "{dec.rationale}"</p>
+                            {dec.supersedesDecisionId && (
+                              <div className="text-[7px] text-purple-400 mt-0.5 font-bold">
+                                Supersedes: {dec.supersedesDecisionId} (Version: {dec.decisionVersion})
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              dec.status === "Approved" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{dec.status}</span>
+                            <span className="text-slate-550 text-[7px] block">{dec.timestamp.substring(11, 19)}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No decision logs recorded. Submit a case.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expiration warning alerts scheduler */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Expiration Renewal Schedulers</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[8.5px] leading-normal text-slate-400">
+                    <div className="bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span className="font-bold text-purple-400 block mb-0.5">RENEWAL REMINDER SCHEDULED</span>
+                      <span>Certification validity audited continuously. Automated renewals triggered 30 days prior to expiry.</span>
                     </div>
                   </div>
                 </div>
