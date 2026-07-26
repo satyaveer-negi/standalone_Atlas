@@ -96,6 +96,12 @@ import { activeAutonomousPlanner } from "../../services/intelligence/planning/Au
 import type { PlanningResult } from "../../services/intelligence/planning/PlanningResult";
 import { activePlanningRepository } from "../../services/intelligence/repository/PlanningRepository";
 import { activePlanningExplanationEngine } from "../../services/intelligence/explainability/PlanningExplanationEngine";
+import { activeEngineeringCouncil } from "../../services/intelligence/cognition/EngineeringCouncil";
+import { activeEngineeringReviewRepository } from "../../services/intelligence/repository/EngineeringReviewRepository";
+import { activeDecisionCoordinator } from "../../services/intelligence/cognition/DecisionCoordinator";
+import type { EngineeringDeliberation } from "../../services/intelligence/cognition/EngineeringDeliberation";
+import type { EngineeringReview } from "../../services/intelligence/cognition/EngineeringReview";
+import type { EngineeringDecision } from "../../services/intelligence/cognition/EngineeringDecision";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -125,6 +131,7 @@ type ActiveWorkspace =
   | "twinStudio"
   | "intentStudio"
   | "planningStudio"
+  | "councilChamber"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -234,6 +241,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [intentExplanation, setIntentExplanation] = useState<any>(null);
   const [intentValidationLogs, setIntentValidationLogs] = useState<string>("");
   const [planningResult, setPlanningResult] = useState<PlanningResult | null>(null);
+  const [activeDeliberation, setActiveDeliberation] = useState<EngineeringDeliberation | null>(null);
+  const [activeReview, setActiveReview] = useState<EngineeringReview | null>(null);
+  const [activeDecision, setActiveDecision] = useState<EngineeringDecision | null>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -989,6 +999,30 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleDeliberateEngineeringIntent = () => {
+    if (!activeIntent) {
+      setIntentValidationLogs("Error: You must parse and validate an intent goal before deliberating.");
+      return;
+    }
+    
+    const { deliberation, review } = activeEngineeringCouncil.deliberate(activeIntent, { temperature: 300 });
+    activeEngineeringReviewRepository.saveDeliberation(deliberation);
+    activeEngineeringReviewRepository.saveReview(review);
+
+    const selectedCandidate = planningResult?.candidates[0] || null;
+    const decision = activeDecisionCoordinator.compileDecision(review, selectedCandidate, "HP (Chief Architect)");
+    activeEngineeringReviewRepository.saveDecision(decision);
+
+    setActiveDeliberation(deliberation);
+    setActiveReview(review);
+    setActiveDecision(decision);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Council Chamber] Deliberation ID ${deliberation.id} logged. Consensus Stats: ${review.consensusStats.agreementScore}% Agreement.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1182,6 +1216,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🗺️ Cognitive Planning Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("councilChamber")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "councilChamber"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🏛️ Cognitive Council Chamber
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -3178,6 +3222,185 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <span className="text-slate-600 italic">Advisor metrics will calculate after planner runs.</span>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "councilChamber" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🏛️ COGNITIVE COUNCIL CHAMBER & GOVERNED DELIBERATION</h3>
+                  <p className="text-[10px] text-slate-500">Multidisciplinary design review boards coordination, task decompositions, consensus building, and governed decision aggregates</p>
+                </div>
+                <div>
+                  {activeIntent ? (
+                    <button
+                      onClick={handleDeliberateEngineeringIntent}
+                      className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                    >
+                      Trigger Council Deliberation
+                    </button>
+                  ) : (
+                    <span className="text-red-400 text-[10px] font-bold">Please parse and validate an intent first.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* Panel 1: Task Decomposition Breakdown */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Task Decomposition</span>
+                  <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeDeliberation ? (
+                      activeDeliberation.tasks.map(t => (
+                        <div key={t.id} className="border-b border-slate-900 pb-1 last:border-0">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">Discipline: {t.discipline}</span>
+                            <span className="text-[7.5px] text-slate-500">{t.status}</span>
+                          </div>
+                          <p className="text-slate-400 text-[8.5px] leading-tight mt-0.5">{t.subgoalText}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No task breakdown generated.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Panel 2: Specialist Opinions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Deliberating Specialist Opinions</span>
+                  <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeDeliberation ? (
+                      activeDeliberation.opinions.map(o => (
+                        <div key={o.agentId} className="border-b border-slate-900 pb-1 last:border-0">
+                          <div className="flex justify-between font-bold text-slate-200">
+                            <span>{o.discipline} Specialist</span>
+                            <span className={`px-1 rounded text-[7.5px] ${
+                              o.verdict === "Accept" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{o.verdict}</span>
+                          </div>
+                          <div className="flex justify-between text-[8px] text-slate-500 mt-0.5">
+                            <span>Score: {o.score}%</span>
+                            <span>Evidence: {o.evidenceRefs.join(", ")}</span>
+                          </div>
+                          <div className="text-[8px] text-slate-400 mt-1 italic leading-tight">
+                            Findings: {o.findings.join(" | ")}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">Opinions gathered upon deliberation trigger.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Panel 3: Consensus Timeline & Conflict Resolver */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Consensus & Conflict Negotiation Timeline</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <div>
+                      <span className="text-purple-300 font-bold block text-[8.5px] border-b border-slate-900 pb-0.5">Deliberation Timeline</span>
+                      <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[7.5px]">
+                        {activeDeliberation ? (
+                          activeDeliberation.timeline.map((evt, idx) => (
+                            <div key={idx} className="border-b border-slate-900 pb-1">
+                              <span className="text-slate-400 font-bold block">{evt.agentName} &rarr; {evt.actionTaken}</span>
+                              <span className="text-slate-600">Agreement snapshot: {evt.consensusSnapshotPercent}%</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-slate-600 italic">Timeline is empty.</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-cyan-400 font-bold block text-[8.5px] border-b border-slate-900 pb-0.5">Disagreements Resolution</span>
+                      <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[7.5px] leading-tight">
+                        {activeReview && activeReview.conflictsLogs.length > 0 ? (
+                          activeReview.conflictsLogs.map((conf, idx) => (
+                            <div key={idx} className="border-b border-slate-900 pb-1">
+                              <span className="text-slate-300 font-bold block">Discrepancy: {conf.assumption}</span>
+                              <span className="text-slate-500">Supporting Evidence: {conf.supportingEvidence}</span>
+                              <span className="text-slate-400 block mt-0.5">Resolution average limit: {conf.resolvedValue}V</span>
+                              <span className="text-emerald-450 mt-0.5 block">Residual risk: {conf.residualRisk}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-slate-600 italic">No parameter conflicts recorded.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Consensus Review & Canonical Gov Decision */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Deliberation Review Findings (Design Board Report Summary)</span>
+                  {activeReview ? (
+                    <div className="grid grid-cols-2 gap-4 mt-1">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-slate-500">Review ID: <strong className="text-slate-300">{activeReview.id}</strong></span>
+                        <span className="text-slate-500">Agreement Score: <strong className="text-cyan-300">{activeReview.consensusStats.agreementScore}%</strong></span>
+                        <span className="text-slate-500">Quorum Coverage: <strong className="text-purple-300">{activeReview.consensusStats.participationCoverage}</strong></span>
+                        <span className="text-slate-500">Open Issues:</span>
+                        <div className="text-slate-400 text-[8px] italic leading-tight">
+                          {activeReview.consensusStats.openIssues.join(", ") || "None flagged."}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 leading-tight border-l border-slate-850 pl-3">
+                        <span className="text-slate-300 font-bold text-[8.5px]">Recommendations Notes:</span>
+                        <p className="text-slate-400">{activeReview.recommendationNote}</p>
+                        <span className="text-slate-300 font-bold text-[8.5px] mt-1">Residual Risks:</span>
+                        <p className="text-slate-500">{activeReview.residualRisks.join(" | ")}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">Deliberation summary report not compiled.</span>
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Canonical Governing Execution Decision Contract</span>
+                  {activeDecision ? (
+                    <div className="flex flex-col gap-1 mt-1 leading-tight">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Decision ID:</span>
+                        <strong className="text-slate-300">{activeDecision.id}</strong>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Approval State:</span>
+                        <span className={`px-1.5 rounded text-[8px] font-bold ${
+                          activeDecision.approvalStatus === "Approved" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                        }`}>{activeDecision.approvalStatus}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Decision Maker:</span>
+                        <span className="text-cyan-300">{activeDecision.approvedBy}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Timestamp:</span>
+                        <span className="text-slate-600">{activeDecision.timestamp.split("T")[1].slice(0, 8)}</span>
+                      </div>
+                      {activeDecision.selectedWorkflowCandidate && (
+                        <div className="mt-2 border-t border-slate-900 pt-2 flex justify-between items-center">
+                          <span className="text-slate-400 block max-w-[120px] truncate">{activeDecision.selectedWorkflowCandidate.name}</span>
+                          <button
+                            onClick={() => handleLoadPlanIntoWorkflowStudio(activeDecision.selectedWorkflowCandidate)}
+                            className="bg-purple-900 hover:bg-purple-800 text-purple-250 font-bold px-2 py-0.5 rounded text-[8px] cursor-pointer"
+                          >
+                            Load Approved Plan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">Governed decision contracts compile on deliberation success.</span>
+                  )}
                 </div>
               </div>
             </div>

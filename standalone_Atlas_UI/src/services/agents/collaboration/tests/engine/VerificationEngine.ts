@@ -13,6 +13,7 @@ import { activeDistributedTwinVerificationContributor } from "../../../../twin/d
 import { activeWorkflowVerificationContributor } from "../../../../workflow/verification/WorkflowVerificationContributor";
 import { activeIntentVerificationContributor } from "../../../../intelligence/verification/IntentVerificationContributor";
 import { activePlanningVerificationContributor } from "../../../../intelligence/verification/PlanningVerificationContributor";
+import { activeCouncilVerificationContributor } from "../../../../intelligence/verification/CouncilVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -57,6 +58,10 @@ export class VerificationEngine {
     // Evaluate Cognitive Planning Intelligence checks
     const planningAsserts = activePlanningVerificationContributor.verifyPlanningEcosystem();
     planningAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Cognitive Council Deliberation checks
+    const councilAsserts = activeCouncilVerificationContributor.verifyCouncilEcosystem();
+    councilAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
