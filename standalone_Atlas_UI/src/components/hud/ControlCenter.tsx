@@ -102,6 +102,12 @@ import { activeDecisionCoordinator } from "../../services/intelligence/cognition
 import type { EngineeringDeliberation } from "../../services/intelligence/cognition/EngineeringDeliberation";
 import type { EngineeringReview } from "../../services/intelligence/cognition/EngineeringReview";
 import type { EngineeringDecision } from "../../services/intelligence/cognition/EngineeringDecision";
+import { activeEngineeringMemory } from "../../services/intelligence/memory/EngineeringMemory";
+import { activeKnowledgeSynthesizer } from "../../services/intelligence/memory/KnowledgeSynthesizer";
+import { activeLessonsLearned } from "../../services/intelligence/memory/LessonsLearned";
+import { activeRecommendationLearner } from "../../services/intelligence/memory/RecommendationLearner";
+import { activeDecisionHistory } from "../../services/intelligence/memory/DecisionHistory";
+import { activeEngineeringMemoryRepository } from "../../services/intelligence/repository/EngineeringMemoryRepository";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -132,6 +138,7 @@ type ActiveWorkspace =
   | "intentStudio"
   | "planningStudio"
   | "councilChamber"
+  | "memoryStudio"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -244,6 +251,8 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [activeDeliberation, setActiveDeliberation] = useState<EngineeringDeliberation | null>(null);
   const [activeReview, setActiveReview] = useState<EngineeringReview | null>(null);
   const [activeDecision, setActiveDecision] = useState<EngineeringDecision | null>(null);
+  const [synthesizedRec, setSynthesizedRec] = useState<any>(null);
+  const [experienceLogs, setExperienceLogs] = useState<any[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1023,6 +1032,52 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleSynthesizeMemoryRecommendations = () => {
+    if (!activeIntent) {
+      setIntentValidationLogs("Error: You must parse and validate an intent goal before synthesizing memory.");
+      return;
+    }
+    const rec = activeKnowledgeSynthesizer.synthesize(activeIntent.goal);
+    setSynthesizedRec(rec);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Memory Engine] Synthesized lessons learned and matches from organizational experiences indexes.`
+    ]);
+  };
+
+  const handleCaptureProjectExperience = (projectName: string, status: "Success" | "Failure") => {
+    if (!activeIntent) {
+      setIntentValidationLogs("Error: No active intent available to index experience.");
+      return;
+    }
+
+    const exp = {
+      id: `exp-${Date.now()}`,
+      projectName,
+      intent: activeIntent,
+      planningResult,
+      decision: activeDecision,
+      verificationReportSummary: status === "Success" ? "All assertions passed" : "Safety constraints violation",
+      outcomeStatus: status,
+      metrics: {
+        executionDurationMs: status === "Success" ? 180000 : 25000,
+        cpuPeakUsagePercent: 62,
+        networkLatencyMs: 15
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    activeEngineeringMemory.captureExperience(exp);
+    activeEngineeringMemoryRepository.saveExperience(exp);
+    setExperienceLogs(activeEngineeringMemory.getExperiences());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Memory Indexer] Captured and archived project "${projectName}" as governed historical experience.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1226,6 +1281,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🏛️ Cognitive Council Chamber
+          </button>
+          <button
+            onClick={() => setActiveTab("memoryStudio")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "memoryStudio"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            💾 Engineering Memory Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -3401,6 +3466,151 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   ) : (
                     <span className="text-slate-600 italic">Governed decision contracts compile on deliberation success.</span>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "memoryStudio" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">💾 ENGINEERING MEMORY & ORGANIZATIONAL LEARNING</h3>
+                  <p className="text-[10px] text-slate-500">Capture, extract, index, and synthesize historical lessons learned and design patterns back into active engineering workflows</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSynthesizeMemoryRecommendations}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Synthesize Recommendations
+                  </button>
+                  <button
+                    onClick={() => handleCaptureProjectExperience("Solar Microgrid Stabilization Project", "Success")}
+                    className="bg-emerald-900 hover:bg-emerald-800 text-emerald-100 font-bold px-2 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Index Success Experience
+                  </button>
+                  <button
+                    onClick={() => handleCaptureProjectExperience("Substation Switch Overload Failure", "Failure")}
+                    className="bg-red-950 hover:bg-red-900 text-red-200 border border-red-800/40 font-bold px-2 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Index Failure Experience
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                {/* Panel 1: Synthesized Recommendation Explorer */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Memory-Synthesized Recommendations</span>
+                  {synthesizedRec ? (
+                    <div className="flex flex-col gap-2 mt-1">
+                      <p className="text-slate-200 leading-relaxed italic">&ldquo;{synthesizedRec.guidanceText}&rdquo;</p>
+                      <div className="flex justify-between border-t border-slate-900 pt-2 text-[8px] text-slate-500">
+                        <span>Similar Projects: <strong>{synthesizedRec.similarProjectsFound}</strong></span>
+                        <span>Confidence: <strong>{synthesizedRec.confidenceScore}%</strong></span>
+                      </div>
+                      {synthesizedRec.applicableLessons.length > 0 && (
+                        <div className="mt-1">
+                          <span className="text-cyan-400 block font-bold text-[8px]">Linked Lesson Recommendation:</span>
+                          <span className="text-slate-400 block text-[8px] mt-0.5 leading-tight">{synthesizedRec.applicableLessons[0].recommendation}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">Synthesize recommendations to extract lessons learned.</span>
+                  )}
+                </div>
+
+                {/* Panel 2: Lessons Learned Ledger */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Lessons Learned Database</span>
+                  <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeLessonsLearned.getLessons().map(l => (
+                      <div key={l.id} className="border-b border-slate-900 pb-1.5 last:border-0 last:pb-0">
+                        <div className="flex justify-between font-bold text-slate-200 text-[8.5px]">
+                          <span>ID: {l.id}</span>
+                          <span className="text-red-400">Impact: {l.impactScore}/10</span>
+                        </div>
+                        <p className="text-slate-400 text-[8px] mt-0.5 leading-tight"><strong>Situation:</strong> {l.situation}</p>
+                        <p className="text-slate-500 text-[8px] mt-0.5 leading-tight"><strong>Root Cause:</strong> {l.rootCause}</p>
+                        <p className="text-emerald-450 text-[8px] mt-0.5 leading-tight"><strong>Resolution:</strong> {l.resolution}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Panel 3: Extracted Reusable Design Patterns */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Extracted Patterns & Rules</span>
+                  <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {experienceLogs.length > 0 ? (
+                      activeEngineeringMemory.getPatterns().map(pat => (
+                        <div key={pat.id} className="border-b border-slate-900 pb-1.5 last:border-0 last:pb-0 leading-tight">
+                          <div className="flex justify-between font-bold text-slate-300">
+                            <span className="truncate max-w-[140px]">{pat.name}</span>
+                            <span className="text-[7.5px] text-cyan-405">{pat.type}</span>
+                          </div>
+                          <p className="text-slate-550 text-[8px] mt-0.5">{pat.description}</p>
+                          <code className="text-orange-400 text-[7.5px] mt-1 block bg-slate-950 px-1 rounded truncate">{pat.reusableRuleExpression}</code>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No patterns extracted. Index successful experience.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Experience Ledger and Weights */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Governing Engineering Experience Ledger</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {experienceLogs.length > 0 ? (
+                      experienceLogs.map(exp => (
+                        <div key={exp.id} className="bg-slate-900 p-2 border border-slate-800 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">{exp.projectName}</span>
+                            <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                              <span>Duration: {exp.metrics.executionDurationMs / 1000}s</span>
+                              <span>CPU: {exp.metrics.cpuPeakUsagePercent}%</span>
+                              <span>Latency: {exp.metrics.networkLatencyMs}ms</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                              exp.outcomeStatus === "Success" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{exp.outcomeStatus}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No experiences recorded in this session. Index an experience to populate ledger.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Recommendation Adaptive Learning Weights</span>
+                  <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Solver Accuracy Weight:</span>
+                      <strong className="text-cyan-300">{activeRecommendationLearner.getWeights().solverAccuracyWeight.toFixed(2)}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Compute Cost Weight:</span>
+                      <strong className="text-cyan-300">{activeRecommendationLearner.getWeights().computeCostWeight.toFixed(2)}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Safety Margin Weight:</span>
+                      <strong className="text-cyan-300">{activeRecommendationLearner.getWeights().safetyMarginWeight.toFixed(2)}</strong>
+                    </div>
+                    <div className="text-[7.5px] text-slate-500 border-t border-slate-900 pt-2 leading-normal">
+                      <strong>Adaptive feedback mechanism:</strong> Verification failures adaptively increase Safety Margin priorities, while success runs optimize accuracy weights.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
