@@ -137,6 +137,12 @@ import { activeCrossDomainSynthesizer } from "../../services/intelligence/synthe
 import type { OperationalOutcome } from "../../services/intelligence/synthesis/OperationalOutcome";
 import type { KnowledgeArtifact } from "../../services/intelligence/synthesis/KnowledgeArtifact";
 import type { SynthesisSession } from "../../services/intelligence/synthesis/SynthesisSession";
+import { activeEvolutionProposalEngine } from "../../services/intelligence/evolution/EvolutionProposalEngine";
+import { activeAutonomousEvolutionCoordinator } from "../../services/intelligence/evolution/AutonomousEvolutionCoordinator";
+import { activeEvolutionRepository } from "../../services/intelligence/repository/EvolutionRepository";
+import type { EvolutionProposal } from "../../services/intelligence/evolution/EvolutionProposal";
+import type { EvolutionImpactAssessment } from "../../services/intelligence/evolution/EvolutionImpactAssessment";
+import type { EvolutionExperiment } from "../../services/intelligence/evolution/EvolutionExperiment";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -172,6 +178,7 @@ type ActiveWorkspace =
   | "twinContinuous"
   | "operationalGovernance"
   | "knowledgeSynthesis"
+  | "engineeringEvolution"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -297,6 +304,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [operationalOutcomes, setOperationalOutcomes] = useState<OperationalOutcome[]>([]);
   const [knowledgeArtifacts, setKnowledgeArtifacts] = useState<KnowledgeArtifact[]>([]);
   const [synthesisSessions, setSynthesisSessions] = useState<SynthesisSession[]>([]);
+  const [evolutionProposals, setEvolutionProposals] = useState<EvolutionProposal[]>([]);
+  const [evolutionAssessments, setEvolutionAssessments] = useState<EvolutionImpactAssessment[]>([]);
+  const [evolutionExperiments, setEvolutionExperiments] = useState<EvolutionExperiment[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1321,6 +1331,50 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleCompileEvolution = () => {
+    if (knowledgeArtifacts.length === 0) {
+      setMockLogs(prev => [
+        ...prev,
+        `[Self-Evolution] Error: No knowledge artifacts available. Run playbook synthesis first.`
+      ]);
+      return;
+    }
+
+    const latestArt = knowledgeArtifacts[knowledgeArtifacts.length - 1];
+    const prop = activeEvolutionProposalEngine.formulateProposal(latestArt);
+    const assessment = activeAutonomousEvolutionCoordinator.assessImpact(prop);
+    const experiment = activeAutonomousEvolutionCoordinator.launchExperiment(prop);
+
+    activeEvolutionRepository.saveProposal(prop);
+    activeEvolutionRepository.saveAssessment(assessment);
+    activeEvolutionRepository.saveExperiment(experiment);
+
+    setEvolutionProposals(activeEvolutionRepository.getProposalsList());
+    setEvolutionAssessments(activeEvolutionRepository.getAssessmentsList());
+    setEvolutionExperiments(activeEvolutionRepository.getExperimentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Self-Evolution] Formulated proposal ${prop.proposalId} (Target: ${prop.implementationTarget}). Launched A/B experiment: Status ${experiment.experimentStatus}.`
+    ]);
+  };
+
+  const handleApproveEvolutionProposal = (proposalId: string) => {
+    const list = activeEvolutionRepository.getProposalsList();
+    const prop = list.find(p => p.proposalId === proposalId);
+
+    if (prop) {
+      prop.status = "Approved";
+      activeEvolutionRepository.saveProposal(prop);
+      setEvolutionProposals(activeEvolutionRepository.getProposalsList());
+
+      setMockLogs(prev => [
+        ...prev,
+        `[Self-Evolution Approval] Evolution proposal ${prop.proposalId} marked APPROVED. Deploying heuristic/policy changes into registry.`
+      ]);
+    }
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1574,6 +1628,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             📚 Knowledge Synthesis
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringEvolution")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringEvolution"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧬 Engineering Evolution
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -4589,6 +4653,181 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-600 italic">No canonical artifacts synthesized yet.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringEvolution" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧬 ENGINEERING EVOLUTION & SELF-IMPROVEMENT ENGINE</h3>
+                  <p className="text-[10px] text-slate-500">Propose controlled self-improvements to heuristics, policies, and workflows under evidence-based governance constraints</p>
+                </div>
+                <div>
+                  <button
+                    onClick={handleCompileEvolution}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Formulate Evolution Proposal
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Capability Improvements */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Capability Improvements</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <span className="text-[8.5px] font-bold text-slate-200">Planning Strategy target:</span>
+                    <span className="text-cyan-300 block truncate">Grid Transient Load Heuristic</span>
+                    <div className="flex justify-between mt-1">
+                      <span>Weight Delta:</span>
+                      <strong className="text-purple-300">+0.15</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Routing Rules:</span>
+                      <strong className="text-purple-300">Dynamic Optimizer</strong>
+                    </div>
+                    <div className="text-[7.5px] text-slate-500 mt-2 leading-normal">
+                      Updates planner heuristic parameters to prioritize high accuracy options.
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Policy & Workflow Evolutions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Policy & Workflow Evolutions</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="border-b border-slate-900 pb-1.5 mb-1.5">
+                      <span className="text-[8.5px] font-bold text-slate-200">Policy Refinement:</span>
+                      <div className="flex justify-between text-slate-400 mt-0.5">
+                        <span>Variable: voltageLimitMax</span>
+                        <strong className="text-orange-400">118V &rarr; 120V</strong>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[8.5px] font-bold text-slate-200">Workflow Variation:</span>
+                      <div className="flex justify-between text-slate-400 mt-0.5">
+                        <span>Template target:</span>
+                        <strong className="text-cyan-300">InsertVerification</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Impact Assessment */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Impact Assessments</span>
+                  {evolutionAssessments.length > 0 ? (
+                    (() => {
+                      const latestAss = evolutionAssessments[evolutionAssessments.length - 1];
+                      return (
+                        <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                          <div className="flex justify-between">
+                            <span>Accuracy Gain:</span>
+                            <strong className="text-emerald-400">+{latestAss.expectedAccuracyGain}%</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Runtime Variance:</span>
+                            <strong className="text-cyan-300">{latestAss.expectedRuntimeImpactMs}ms</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Compatibility Risk:</span>
+                            <strong className="text-cyan-300">{latestAss.compatibilityRisk}</strong>
+                          </div>
+                          <div className="text-[7.5px] text-slate-500 leading-normal mt-1">
+                            Migration: {latestAss.migrationComplexityText}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">No impact assessments loaded.</span>
+                  )}
+                </div>
+
+                {/* 4. Evolution Repository Metrics */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Evolution Quality Ledger</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Proposals Compiled:</span>
+                      <strong className="text-cyan-300">{activeEvolutionRepository.getMetrics().totalProposalsGenerated}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Approval Ratio:</span>
+                      <strong className="text-cyan-300">{activeEvolutionRepository.getMetrics().proposalsApprovedRatio}%</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Experiment Success Score:</span>
+                      <strong className="text-cyan-300">{activeEvolutionRepository.getMetrics().meanExperimentSuccessScore}%</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Proposals queue and experiments ledger */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Self-Evolution Proposals Queue</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {evolutionProposals.length > 0 ? (
+                      [...evolutionProposals].reverse().map(prop => (
+                        <div key={prop.proposalId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Proposal ID: {prop.proposalId} (Target: {prop.implementationTarget})</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              Suggested: "{prop.suggestedChange}"
+                            </div>
+                            <div className="flex gap-2 text-slate-600 text-[7px] mt-0.5">
+                              <span>Confidence: {prop.confidenceScore}%</span>
+                              <span>Risk Score: {prop.quantifiedRisksScore}/100</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {prop.status === "Proposed" && (
+                              <button
+                                onClick={() => handleApproveEvolutionProposal(prop.proposalId)}
+                                className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-2 py-0.5 rounded text-[8px] cursor-pointer"
+                              >
+                                Review
+                              </button>
+                            )}
+                            <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                              prop.status === "Approved" ? "bg-emerald-950 text-emerald-450" : "bg-slate-950 text-slate-400"
+                            }`}>{prop.status}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No proposals registered in the evolution queue.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">6. Active A/B Experiments Trials</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {evolutionExperiments.length > 0 ? (
+                      [...evolutionExperiments].reverse().map(exp => (
+                        <div key={exp.experimentId} className="bg-slate-900 p-2 border border-slate-850 rounded text-slate-400 leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Exp ID: {exp.experimentId}</span>
+                            <span className="px-1 rounded text-[7px] bg-emerald-950 text-emerald-400">{exp.experimentStatus}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-500 leading-normal mb-1">Baseline: {exp.baselinePerformance}</p>
+                          <p className="text-[7.5px] text-purple-300 leading-normal">Candidate: {exp.candidatePerformance}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No experiments registered.</span>
                     )}
                   </div>
                 </div>

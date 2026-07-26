@@ -19,6 +19,7 @@ import { activeDecisionVerificationContributor } from "../../../../intelligence/
 import { activeRuntimeVerificationContributor } from "../../../../intelligence/verification/RuntimeVerificationContributor";
 import { activeGovernanceVerificationContributor } from "../../../../intelligence/verification/GovernanceVerificationContributor";
 import { activeSynthesisVerificationContributor } from "../../../../intelligence/verification/SynthesisVerificationContributor";
+import { activeEvolutionVerificationContributor } from "../../../../intelligence/verification/EvolutionVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -87,6 +88,10 @@ export class VerificationEngine {
     // Evaluate Engineering Knowledge Synthesis checks
     const synthesisAsserts = activeSynthesisVerificationContributor.verifySynthesisEcosystem();
     synthesisAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Autonomous Engineering Evolution checks
+    const evolutionAsserts = activeEvolutionVerificationContributor.verifyEvolutionEcosystem();
+    evolutionAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
