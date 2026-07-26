@@ -158,6 +158,12 @@ import type { ConstitutionalDecision } from "../../services/intelligence/constit
 import type { ConstitutionalViolation } from "../../services/intelligence/constitution/ConstitutionalViolation";
 import type { ConstitutionalException } from "../../services/intelligence/constitution/ConstitutionalException";
 import type { ConstitutionalComplianceReport } from "../../services/intelligence/constitution/ConstitutionalComplianceReport";
+import { activeTrustEvaluator } from "../../services/intelligence/trust/TrustEvaluator";
+import { activeProvenanceTracker } from "../../services/intelligence/trust/ProvenanceTracker";
+import { activeTrustRepository } from "../../services/intelligence/repository/TrustRepository";
+import type { KnowledgeTrustRecord } from "../../services/intelligence/trust/KnowledgeTrustRecord";
+import type { ProvenanceCustodyNode } from "../../services/intelligence/trust/ProvenanceTracker";
+import type { TrustMetrics } from "../../services/intelligence/repository/TrustRepository";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -196,6 +202,7 @@ type ActiveWorkspace =
   | "engineeringEvolution"
   | "metaCognitive"
   | "engineeringConstitution"
+  | "knowledgeTrust"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -333,6 +340,9 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [constitutionalViolations, setConstitutionalViolations] = useState<ConstitutionalViolation[]>([]);
   const [constitutionalExceptions, setConstitutionalExceptions] = useState<ConstitutionalException[]>([]);
   const [constitutionalReports, setConstitutionalReports] = useState<ConstitutionalComplianceReport[]>([]);
+  const [trustRecords, setTrustRecords] = useState<KnowledgeTrustRecord[]>([]);
+  const [trustHops, setTrustHops] = useState<ProvenanceCustodyNode[]>([]);
+  const [trustMetrics, setTrustMetrics] = useState<TrustMetrics>(activeTrustRepository.getMetrics());
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1508,6 +1518,69 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerTrustEvaluation = () => {
+    // 1. Register a new provenance hop
+    const hop = activeProvenanceTracker.registerHop(
+      "mock-art-trust-01",
+      "Knowledge Synthesis Compiler",
+      "synthesis-consensus-report-v1"
+    );
+    activeTrustRepository.saveHop(hop);
+
+    // 2. Evaluate trust
+    const ktr = activeTrustEvaluator.evaluateTrust(
+      "mock-art-trust-01",
+      [hop.nodeId],
+      95, // evidence quality score
+      ["Tamper check passed", "Signature validated successfully", "Pillar 1 rules verified"],
+      "Valid"
+    );
+    activeTrustRepository.saveRecord(ktr);
+
+    // Refresh UI States
+    setTrustHops(activeProvenanceTracker.getHops());
+    setTrustRecords(activeTrustRepository.getRecordsList());
+
+    // Update repository metrics
+    const list = activeTrustRepository.getRecordsList();
+    const sum = list.reduce((acc, curr) => acc + curr.trustScore, 0);
+    const averageTrustScore = list.length > 0 ? Math.round(sum / list.length) : 94.2;
+    activeTrustRepository.updateMetrics({ averageTrustScore });
+    setTrustMetrics(activeTrustRepository.getMetrics());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Knowledge Trust] Evaluated trust record ${ktr.recordId}. Trust Score: ${ktr.trustScore}%. Integrity Status: ${ktr.integrityStatus}.`
+    ]);
+  };
+
+  const handleSimulateTamperAlert = () => {
+    if (trustRecords.length === 0) {
+      setMockLogs(prev => [...prev, `[Knowledge Trust Alert] Error: No trust records to tamper. Run evaluation first.`]);
+      return;
+    }
+
+    // Tamper the latest record
+    const latest = trustRecords[trustRecords.length - 1];
+    latest.integrityStatus = "Invalid";
+    latest.trustScore = 0; // Drop trust immediately on tamper alert
+    activeTrustRepository.saveRecord(latest);
+
+    // Update metrics
+    const currentMetrics = activeTrustRepository.getMetrics();
+    activeTrustRepository.updateMetrics({
+      tamperedAssetsDetected: currentMetrics.tamperedAssetsDetected + 1
+    });
+
+    setTrustRecords(activeTrustRepository.getRecordsList());
+    setTrustMetrics(activeTrustRepository.getMetrics());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[CRITICAL TRUST ALERT] Integrity check FAILED for artifact ${latest.artifactId}! Trust score revoked to 0%. Security interlocks engaged.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1791,6 +1864,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             📜 Constitution Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("knowledgeTrust")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "knowledgeTrust"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🤝 Trust Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -5285,6 +5368,145 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     ) : (
                       <span className="text-slate-600 italic">No active exceptions waiving compliance checks.</span>
                     )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "knowledgeTrust" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🤝 ENGINEERING KNOWLEDGE TRUST & PROVENANCE STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Cryptographically track ownership provenance chains, audit asset integrity, score confidence factors, and alert on expiration scheduling reviews</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerTrustEvaluation}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Evaluate Trust
+                  </button>
+                  <button
+                    onClick={handleSimulateTamperAlert}
+                    className="bg-red-900 hover:bg-red-800 text-red-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Tamper
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Trust Dashboard summary */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Trust Assessment Metrics</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span>Average Trust Score:</span>
+                      <strong className="text-cyan-300 text-xs">{trustMetrics.averageTrustScore}%</strong>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span>Tampered Assets:</span>
+                      <strong className={trustMetrics.tamperedAssetsDetected > 0 ? "text-red-400 font-bold" : "text-emerald-450"}>
+                        {trustMetrics.tamperedAssetsDetected} Alert(s)
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Expiring Trust Records:</span>
+                      <strong className="text-cyan-300">{trustMetrics.expiringTrustRecords}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Expiration alerts schedule */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Trusted Knowledge Assets Registry</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {trustRecords.length > 0 ? (
+                      [...trustRecords].reverse().map(ktr => (
+                        <div key={ktr.recordId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">KTR: {ktr.recordId} (Art: {ktr.artifactId})</span>
+                            <span className={`px-1 rounded text-[7px] ${
+                              ktr.integrityStatus === "Valid" ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"
+                            }`}>{ktr.integrityStatus}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500 text-[7.5px] mt-0.5">
+                            <span>Evidence Quality: {ktr.evidenceQuality}%</span>
+                            <span>Trust Score Score: <strong className="text-cyan-300">{ktr.trustScore}%</strong></span>
+                          </div>
+                          <div className="text-[7px] text-purple-400 mt-1">
+                            Custody Hops: {ktr.provenanceChain.join(" &rarr; ")}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No trusted records compiled. Trigger trust evaluation.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Review limits scheduler */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Expiration Review Limits</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <span className="text-[8px] font-bold text-slate-200">Revalidation Thresholds:</span>
+                    <div className="flex justify-between text-slate-500 text-[8px] mt-0.5">
+                      <span>Standard Lifespan:</span>
+                      <strong className="text-cyan-300">30 Days</strong>
+                    </div>
+                    <div className="flex justify-between text-slate-500 text-[8px]">
+                      <span>Check Autonomy Type:</span>
+                      <strong className="text-cyan-300">Signature Verify</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Provenance nodes list and integrity logs */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Provenance Hops */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Provenance Custody Trackers</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {trustHops.length > 0 ? (
+                      [...trustHops].reverse().map(hop => (
+                        <div key={hop.nodeId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Hop Node: {hop.nodeId}</span>
+                            <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                              <span>Source: {hop.sourceArtifactId}</span>
+                              <span>Component: {hop.producingComponent}</span>
+                            </div>
+                            <div className="text-[7.5px] text-purple-400 mt-1 leading-normal font-sans">
+                              Verification Reference: {hop.verificationReference}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="px-1.5 py-0.5 rounded text-[8px] bg-emerald-950 text-emerald-450 border border-emerald-900/50">
+                              {hop.signatureStatus}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No custody hops registered. Trigger trust evaluation to trace hops.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Integrity logs queue */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Integrity Verification Audit logs</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1 text-[8.5px] leading-normal text-slate-400">
+                    <div className="bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span className="font-bold text-emerald-400 block mb-0.5">INTEGRITY CHECK PASSED</span>
+                      <span>Artifact hashes matched the signed genesis block configuration.</span>
+                    </div>
                   </div>
                 </div>
               </div>
