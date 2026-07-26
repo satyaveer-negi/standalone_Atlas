@@ -169,6 +169,14 @@ import type { AssuranceCase } from "../../services/intelligence/assurance/Assura
 import type { CertificationPackage } from "../../services/intelligence/assurance/CertificationPackage";
 import type { CertificationDecision } from "../../services/intelligence/assurance/CertificationDecision";
 import type { CertificationAuthority } from "../../services/intelligence/assurance/CertificationAuthority";
+import { activeRiskRepository } from "../../services/intelligence/repository/RiskRepository";
+import type { RiskCase } from "../../services/intelligence/risk/RiskCase";
+import type { Hazard } from "../../services/intelligence/risk/Hazard";
+import type { MitigationPlan } from "../../services/intelligence/risk/MitigationPlan";
+import type { SafetyCase } from "../../services/intelligence/risk/SafetyCase";
+import type { RiskAssessment } from "../../services/intelligence/risk/RiskAssessment";
+import type { ResidualRiskAssessment } from "../../services/intelligence/risk/ResidualRiskAssessment";
+import type { IncidentRecord } from "../../services/intelligence/risk/IncidentRecord";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -208,6 +216,8 @@ type ActiveWorkspace =
   | "metaCognitive"
   | "engineeringConstitution"
   | "knowledgeTrust"
+  | "engineeringAssurance"
+  | "engineeringRisk"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -352,6 +362,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [certificationPackages, setCertificationPackages] = useState<CertificationPackage[]>([]);
   const [certificationDecisions, setCertificationDecisions] = useState<CertificationDecision[]>([]);
   const [certificationAuthorities, setCertificationAuthorities] = useState<CertificationAuthority[]>(activeAssuranceRepository.getAuthoritiesList());
+  const [riskCases, setRiskCases] = useState<RiskCase[]>([]);
+  const [riskHazards, setRiskHazards] = useState<Hazard[]>([]);
+  const [riskMitigations, setRiskMitigations] = useState<MitigationPlan[]>([]);
+  const [safetyCasesList, setSafetyCasesList] = useState<SafetyCase[]>([]);
+  const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
+  const [residualRiskAssessments, setResidualRiskAssessments] = useState<ResidualRiskAssessment[]>([]);
+  const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1690,6 +1707,147 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerRiskAssessment = () => {
+    // 1. Register Hazard
+    const hazardId = `haz-${Date.now()}`;
+    const h: Hazard = {
+      hazardId,
+      description: "Turbine load transient spikes",
+      cause: "High wind simulation transient conditions",
+      trigger: "Transient loads exceeds limits threshold",
+      consequence: "Blade structural deformation failure",
+      severity: 4,
+      likelihood: 3,
+      detectability: 4,
+      exposure: 3,
+      controls: ["Automated pitch controller trigger"],
+      state: "Controlled"
+    };
+    activeRiskRepository.saveHazard(h);
+
+    // 2. Register MitigationPlan
+    const mitigationPlanId = `mp-${Date.now()}`;
+    const mp: MitigationPlan = {
+      mitigationPlanId,
+      preventiveControls: ["Pitch controller limit logic"],
+      detectiveControls: ["Vibration sensors monitoring rules"],
+      correctiveControls: ["Load governor bypass activation"],
+      verificationActivities: ["Assert governor response latency < 50ms"],
+      monitoringRules: ["Check high load triggers"],
+      residualRiskTarget: 12,
+      implementationStatus: "InEffect",
+      responsibleOwner: "Safety Engineering Board",
+      verificationCompletionDate: new Date().toISOString()
+    };
+    activeRiskRepository.saveMitigation(mp);
+
+    // 3. Register RiskAssessment & ResidualRiskAssessment
+    const ra: RiskAssessment = {
+      assessmentId: `ra-${Date.now()}`,
+      likelihood: 3,
+      consequence: 4,
+      exposure: 3,
+      detectability: 4,
+      overallRiskRating: 48,
+      assessmentMethod: "FMEA Standards",
+      assessmentDate: new Date().toISOString()
+    };
+    activeRiskRepository.saveAssessment(ra);
+
+    const rra: ResidualRiskAssessment = {
+      residualAssessmentId: `rra-${Date.now()}`,
+      linkedRiskCaseId: `rc-${Date.now()}`,
+      mitigationPlanRef: mitigationPlanId,
+      initialRisk: 48,
+      residualRisk: 12,
+      acceptanceRationale: "Residual risk within safe operating margin limits.",
+      reviewerName: "Compliance Officer Board",
+      approvalDate: new Date().toISOString()
+    };
+    activeRiskRepository.saveResidualAssessment(rra);
+
+    // 4. Register RiskCase
+    const rc: RiskCase = {
+      caseId: rra.linkedRiskCaseId,
+      targetAssetId: "mock-art-trust-01",
+      riskDescription: "Blade structural load deformation under peak high winds conditions",
+      hazardsLinked: [hazardId],
+      mitigationPlanId,
+      initialRiskScore: 48,
+      residualRiskScore: 12,
+      riskStatus: "Mitigated",
+      riskOwner: "Safety Engineering Board",
+      reviewDate: new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString(),
+      classification: "Mechanical",
+      domain: "PowerSystems"
+    };
+    activeRiskRepository.saveCase(rc);
+
+    // 5. Compile Safety Case
+    const sc: SafetyCase = {
+      safetyCaseId: `sc-${Date.now()}`,
+      safetyClaim: "Load margins validated compliant. Structural failure risk mitigated.",
+      supportingEvidence: ["Verification suite assertions completed successfully"],
+      assuranceReferences: ["case-mock-case-01"],
+      riskAssessments: [ra.assessmentId],
+      mitigationEvidence: ["Governor activation response time < 50ms verified"],
+      residualRisk: 12,
+      acceptanceCriteria: "Residual risk < 15",
+      approvalStatus: "Approved"
+    };
+    activeRiskRepository.saveSafetyCase(sc);
+
+    // Refresh UI States
+    setRiskHazards(activeRiskRepository.getHazardsList());
+    setRiskMitigations(activeRiskRepository.getMitigationsList());
+    setRiskAssessments(activeRiskRepository.getAssessmentsList());
+    setResidualRiskAssessments(activeRiskRepository.getResidualAssessmentsList());
+    setRiskCases(activeRiskRepository.getCasesList());
+    setSafetyCasesList(activeRiskRepository.getSafetyCasesList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Risk Assessment] Compiled RiskCase ${rc.caseId} (Residual Score: ${rc.residualRiskScore}). SafetyCase ${sc.safetyCaseId} Approved.`
+    ]);
+  };
+
+  const handleTriggerOperationalIncident = () => {
+    if (riskCases.length === 0) {
+      setMockLogs(prev => [...prev, `[Risk Alert] Error: No risk cases active. Run risk assessment first.`]);
+      return;
+    }
+
+    const latestCase = riskCases[riskCases.length - 1];
+    
+    // Register Incident
+    const ir: IncidentRecord = {
+      incidentId: `inc-${Date.now()}`,
+      linkedRiskCaseId: latestCase.caseId,
+      rootCause: "Turbine wind speed transient gust exceeded maximum pitch rate.",
+      operationalImpact: "High vibration alert warnings triggered. Transient governor activated.",
+      correctiveAction: "Adjust pitch controller response curves dynamically via self-evolution proposals.",
+      lessonsLearned: "Improve safety margins checks under rapid wind changes conditions.",
+      timestamp: new Date().toISOString()
+    };
+    activeRiskRepository.saveIncident(ir);
+
+    // Degrade safety case approval status
+    const list = activeRiskRepository.getSafetyCasesList();
+    if (list.length > 0) {
+      const sc = list[list.length - 1];
+      sc.approvalStatus = "Rejected"; // Revoke safety status immediately on incident
+      activeRiskRepository.saveSafetyCase(sc);
+    }
+
+    setIncidentRecords(activeRiskRepository.getIncidentsList());
+    setSafetyCasesList(activeRiskRepository.getSafetyCasesList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[CRITICAL INCIDENT ALERT] Operational incident logged: ${ir.incidentId}. Safety Case revoked. Security interlocks engaged.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1983,6 +2141,26 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🤝 Trust Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringAssurance")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringAssurance"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🎖️ Assurance Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringRisk")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringRisk"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            ⚠️ Risk & Safety Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -5753,6 +5931,162 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       <span className="font-bold text-purple-400 block mb-0.5">RENEWAL REMINDER SCHEDULED</span>
                       <span>Certification validity audited continuously. Automated renewals triggered 30 days prior to expiry.</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringRisk" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">⚠️ ENGINEERING RISK & SAFETY CASE STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Continuous hazard verification matrices, safety barrier control mitigations, real-world incident feedback loops, and dynamic safety claims validation</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerRiskAssessment}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Trigger Risk Assessment
+                  </button>
+                  <button
+                    onClick={handleTriggerOperationalIncident}
+                    className="bg-red-900 hover:bg-red-800 text-red-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Incident
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Risk Matrix Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Active Risks Heatmap Ledger</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {riskCases.length > 0 ? (
+                      [...riskCases].reverse().map(rc => (
+                        <div key={rc.caseId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <div className="flex justify-between">
+                            <span className="text-cyan-300 font-bold">Case: {rc.caseId}</span>
+                            <span className={`px-1 rounded text-[7.5px] ${
+                              rc.riskStatus === "Mitigated" ? "bg-emerald-950 text-emerald-450" : "bg-red-955 text-red-400"
+                            }`}>{rc.riskStatus}</span>
+                          </div>
+                          <div>Asset: {rc.targetAssetId}</div>
+                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                            <span>Initial: <strong className="text-red-400">{rc.initialRiskScore}</strong></span>
+                            <span>Residual: <strong className="text-emerald-400">{rc.residualRiskScore}</strong></span>
+                            <span>Domain: {rc.domain}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No risk cases recorded. Trigger assessment.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Hazards Registry */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Potential Failure Modes (Hazards Registry)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {riskHazards.length > 0 ? (
+                      [...riskHazards].reverse().map(haz => (
+                        <div key={haz.hazardId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Hazard: {haz.hazardId} ({haz.state})</span>
+                            <span className="text-slate-500">Sev: {haz.severity} | Lik: {haz.likelihood} | Det: {haz.detectability}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-300">Cause: "{haz.cause}" &rarr; Consequence: "{haz.consequence}"</p>
+                          <p className="text-[7.5px] text-purple-400 mt-1">Barrier: {haz.controls.join(", ")}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No hazards analyzed.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Safety Claim & Acceptance Criteria */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Safety Arguments (Safety Cases)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {safetyCasesList.length > 0 ? (
+                      [...safetyCasesList].reverse().map(sc => (
+                        <div key={sc.safetyCaseId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Safety Case: {sc.safetyCaseId}</span>
+                            <span className={`px-1 rounded text-[7.5px] font-bold ${
+                              sc.approvalStatus === "Approved" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                            }`}>{sc.approvalStatus}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-300">Claim: "{sc.safetyClaim}"</p>
+                          <p className="text-[7px] text-purple-400 mt-1">Residual Risk: {sc.residualRisk} (Criteria: {sc.acceptanceCriteria})</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No safety cases compiled.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Mitigations ledger and incidents feedback logs */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Mitigation Plans */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Safety Mitigation Barriers & Active Controls</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {riskMitigations.length > 0 ? (
+                      [...riskMitigations].reverse().map(mit => (
+                        <div key={mit.mitigationPlanId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Mitigation ID: {mit.mitigationPlanId}</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              <div>Preventive: {mit.preventiveControls.join(", ")}</div>
+                              <div>Detective: {mit.detectiveControls.join(", ")}</div>
+                              <div>Corrective: {mit.correctiveControls.join(", ")}</div>
+                              <div className="text-purple-400 font-bold mt-1">Verification: "{mit.verificationActivities.join(", ")}"</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              mit.implementationStatus === "InEffect" ? "bg-emerald-950 text-emerald-450" : "bg-yellow-950 text-yellow-450"
+                            }`}>{mit.implementationStatus}</span>
+                            <span className="text-slate-550 text-[7px] block">Target Score: {mit.residualRiskTarget}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No mitigations applied yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Incident record logs */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Incident Feedbacks & Root Cause Records</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {incidentRecords.length > 0 ? (
+                      [...incidentRecords].reverse().map(inc => (
+                        <div key={inc.incidentId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal border-l-2 border-red-500">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-red-400">Incident: {inc.incidentId}</span>
+                            <span className="text-slate-500">{inc.timestamp.substring(11, 19)}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-300 font-bold">Root Cause: {inc.rootCause}</p>
+                          <p className="text-[7.5px] text-slate-500 leading-normal mt-1 italic">"Impact: {inc.operationalImpact}"</p>
+                          <p className="text-[7px] text-purple-400 mt-1 font-bold">Corrective Action: {inc.correctiveAction}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No incident feedback recorded. Run Incident Simulation to trigger safety interlocks feedback loop.</span>
+                    )}
                   </div>
                 </div>
               </div>

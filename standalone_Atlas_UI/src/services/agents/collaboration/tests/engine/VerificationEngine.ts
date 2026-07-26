@@ -24,6 +24,7 @@ import { activeMetaCognitiveVerificationContributor } from "../../../../intellig
 import { activeConstitutionVerificationContributor } from "../../../../intelligence/verification/ConstitutionVerificationContributor";
 import { activeTrustVerificationContributor } from "../../../../intelligence/verification/TrustVerificationContributor";
 import { activeAssuranceVerificationContributor } from "../../../../intelligence/verification/AssuranceVerificationContributor";
+import { activeRiskVerificationContributor } from "../../../../intelligence/verification/RiskVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -112,6 +113,10 @@ export class VerificationEngine {
     // Evaluate Engineering Assurance checks
     const assuranceAsserts = activeAssuranceVerificationContributor.verifyAssuranceEcosystem();
     assuranceAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Engineering Risk checks
+    const riskAsserts = activeRiskVerificationContributor.verifyRiskEcosystem();
+    riskAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
