@@ -112,6 +112,16 @@ import { activeDecisionIntelligence } from "../../services/intelligence/decision
 import { activeDecisionRepository } from "../../services/intelligence/repository/DecisionRepository";
 import { activeDecisionExplanationEngine } from "../../services/intelligence/decision/DecisionExplanationEngine";
 import type { EngineeringRecommendation } from "../../services/intelligence/decision/EngineeringRecommendation";
+import { activeContinuousTwinIntelligence } from "../../services/intelligence/runtime/ContinuousTwinIntelligence";
+import { activeRuntimePolicyEngine } from "../../services/intelligence/runtime/RuntimePolicyEngine";
+import { activeTelemetryManager } from "../../services/intelligence/runtime/TelemetryManager";
+import { activeStateChangeDetector } from "../../services/intelligence/runtime/StateChangeDetector";
+import { activeEventCorrelationEngine } from "../../services/intelligence/runtime/EventCorrelationEngine";
+import { activeEngineeringSituationRepository } from "../../services/intelligence/repository/EngineeringSituationRepository";
+import { activeEngineeringHeartbeat } from "../../services/intelligence/runtime/EngineeringHeartbeat";
+import { activeNotificationCoordinator } from "../../services/intelligence/runtime/NotificationCoordinator";
+import type { EngineeringSituation } from "../../services/intelligence/runtime/EngineeringSituation";
+import type { CorrelatedSituation } from "../../services/intelligence/runtime/CorrelatedSituation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -144,6 +154,7 @@ type ActiveWorkspace =
   | "councilChamber"
   | "memoryStudio"
   | "decisionStudio"
+  | "twinContinuous"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -259,6 +270,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [synthesizedRec, setSynthesizedRec] = useState<any>(null);
   const [experienceLogs, setExperienceLogs] = useState<any[]>([]);
   const [activeRecommendation, setActiveRecommendation] = useState<EngineeringRecommendation | null>(null);
+  const [situations, setSituations] = useState<EngineeringSituation[]>([]);
+  const [correlatedSituations, setCorrelatedSituations] = useState<CorrelatedSituation[]>([]);
+  const [anomalyTriggered, setAnomalyTriggered] = useState(false);
+  const [heartbeatTicks, setHeartbeatTicks] = useState(0);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1113,6 +1128,46 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerHeartbeatCycle = () => {
+    activeEngineeringHeartbeat.heartbeat(() => {
+      const { situation, correlated, reevaluatedRec } = activeContinuousTwinIntelligence.reassess(
+        anomalyTriggered,
+        activeRecommendation
+      );
+
+      activeEngineeringSituationRepository.saveSituation(situation);
+      activeEngineeringSituationRepository.saveCorrelated(correlated);
+
+      setSituations(activeEngineeringSituationRepository.getSituationsList());
+      setCorrelatedSituations(activeEngineeringSituationRepository.getCorrelatedList());
+      setHeartbeatTicks(activeEngineeringHeartbeat.getTickCount());
+
+      if (reevaluatedRec) {
+        setActiveRecommendation(reevaluatedRec);
+        setMockLogs(prev => [
+          ...prev,
+          `[Decision Re-Evaluation] Anomaly triggers reevaluation: Compiled recommendation ID ${reevaluatedRec.id} (Temp: ${situation.twinSnapshot.temperature}°C).`
+        ]);
+      }
+
+      setMockLogs(prev => [
+        ...prev,
+        `[Heartbeat Cycle #${activeEngineeringHeartbeat.getTickCount()}] Voltage: ${situation.twinSnapshot.voltage}V | Temp: ${situation.twinSnapshot.temperature}°C | Severity: ${correlated.severity}`
+      ]);
+    });
+  };
+
+  const handleToggleAnomalyState = () => {
+    setAnomalyTriggered(prev => {
+      const newVal = !prev;
+      setMockLogs(log => [
+        ...log,
+        `[Twin Anomaly Simulation] Toggled simulated telemetry mode to: ${newVal ? "CRITICAL OVERLOAD" : "NOMINAL FLUX"}`
+      ]);
+      return newVal;
+    });
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1336,6 +1391,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧠 Decision Intelligence Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("twinContinuous")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "twinContinuous"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🌍 Continuous Twin Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -3800,6 +3865,199 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "twinContinuous" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🌍 CONTINUOUS TWIN OPERATIONS & RUNTIME INTELLIGENCE</h3>
+                  <p className="text-[10px] text-slate-500">Observe real-time telemetry, evaluate runtime constraints against policies, and auto-flag correlated situation anomalies</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleToggleAnomalyState}
+                    className={`font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap ${
+                      anomalyTriggered
+                        ? "bg-red-900 text-red-100 hover:bg-red-800"
+                        : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    {anomalyTriggered ? "⚠️ Trigger Nominal Mode" : "⚡ Simulate Overload Anomaly"}
+                  </button>
+                  <button
+                    onClick={handleTriggerHeartbeatCycle}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap animate-pulse"
+                  >
+                    🔄 Cycle Heartbeat (Ticks: {heartbeatTicks})
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                {/* Panel 1: Live Telemetry & Normalizations */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Normalized Telemetry Stream</span>
+                  {situations.length > 0 ? (
+                    (() => {
+                      const latest = situations[situations.length - 1];
+                      return (
+                        <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-300">
+                          <div className="grid grid-cols-3 gap-2 text-center text-[8.5px] border-b border-slate-900 pb-2">
+                            <div className="p-1 bg-slate-900 rounded">
+                              <span className="text-slate-500 block">Voltage</span>
+                              <strong className="text-cyan-300 text-xs">{latest.twinSnapshot.voltage}V</strong>
+                            </div>
+                            <div className="p-1 bg-slate-900 rounded">
+                              <span className="text-slate-500 block">Temperature</span>
+                              <strong className="text-cyan-300 text-xs">{latest.twinSnapshot.temperature}°C</strong>
+                            </div>
+                            <div className="p-1 bg-slate-900 rounded">
+                              <span className="text-slate-500 block">Load</span>
+                              <strong className="text-cyan-300 text-xs">{latest.twinSnapshot.loadKW} kW</strong>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1 text-slate-400 mt-1">
+                            <div className="flex justify-between">
+                              <span>Safety Boundary Check:</span>
+                              <strong className={latest.safetyStatus === "Passed" ? "text-emerald-400" : "text-red-400"}>
+                                {latest.safetyStatus}
+                              </strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Active Workflow:</span>
+                              <span className="text-purple-300 font-bold truncate max-w-[120px]">{latest.activeWorkflowId}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Operating CPU / Mem:</span>
+                              <span className="text-slate-500">{latest.runtimeMetrics.cpuPercent}% / {latest.runtimeMetrics.memoryMb}MB</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">No telemetry cycles processed. Run heartbeat cycle to poll.</span>
+                  )}
+                </div>
+
+                {/* Panel 2: Runtime Policy Engine Configurations */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Active Runtime Policy Rules</span>
+                  <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between">
+                      <span>Max Voltage Threshold:</span>
+                      <strong className="text-orange-400">{activeRuntimePolicyEngine.getPolicy().voltageLimitMax}V</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Max Thermal Ceiling:</span>
+                      <strong className="text-orange-400">{activeRuntimePolicyEngine.getPolicy().temperatureLimitMax}°C</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Polling Frequency:</span>
+                      <strong className="text-cyan-300">Every {activeRuntimePolicyEngine.getPolicy().reassessmentFrequencySeconds}s</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Auto Re-evaluate Decisions:</span>
+                      <strong className="text-emerald-450">{activeRuntimePolicyEngine.getPolicy().autoReevaluateDecision ? "Enabled" : "Disabled"}</strong>
+                    </div>
+                    <div className="text-[7.5px] text-slate-500 border-t border-slate-900 pt-2 leading-normal">
+                      <strong>Policy Rules Scope:</strong> Triggers notifications, limits checks, and safety violations warnings dynamically without code updates.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Panel 3: Correlated Situations Ledger */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Event Correlation Log</span>
+                  <div className="max-h-[145px] overflow-y-auto flex flex-col gap-2 mt-1 leading-tight">
+                    {correlatedSituations.length > 0 ? (
+                      [...correlatedSituations].reverse().map((corr, idx) => (
+                        <div key={idx} className="border-b border-slate-900 pb-1.5 last:border-0 last:pb-0">
+                          <div className="flex justify-between text-[8.5px] font-bold text-slate-200">
+                            <span className="text-slate-400">ID: {corr.id}</span>
+                            <span className={`px-1 rounded text-[7.5px] ${
+                              corr.severity === "Emergency" || corr.severity === "Critical"
+                                ? "bg-red-950 text-red-400"
+                                : corr.severity === "Warning"
+                                ? "bg-yellow-950 text-yellow-400"
+                                : "bg-emerald-950 text-emerald-400"
+                            }`}>{corr.severity}</span>
+                          </div>
+                          <p className="text-slate-300 text-[8.5px] mt-1 leading-normal italic">
+                            &ldquo;{corr.rootCauseHypothesis}&rdquo;
+                          </p>
+                          {corr.correlationRulesApplied.length > 0 && (
+                            <div className="text-[7.5px] text-purple-400 mt-0.5">
+                              Rule: {corr.correlationRulesApplied.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No correlated anomalies recorded.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Situation Timeline Stream & Active Alerts notifications */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Situation Timeline History</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {situations.length > 0 ? (
+                      [...situations].reverse().map(sit => (
+                        <div key={sit.id} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Situation ID: {sit.id}</span>
+                            <div className="flex gap-2 text-slate-500 text-[8px] mt-0.5">
+                              <span>Volt: {sit.twinSnapshot.voltage}V</span>
+                              <span>Temp: {sit.twinSnapshot.temperature}°C</span>
+                              <span>Load: {sit.twinSnapshot.loadKW}kW</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="px-1 py-0.5 rounded text-[8px] bg-slate-950 text-cyan-400 border border-cyan-900/50">
+                              {sit.lifecycle}
+                            </span>
+                            <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                              sit.severity === "Emergency" || sit.severity === "Critical"
+                                ? "bg-red-950 text-red-400"
+                                : "bg-emerald-950 text-emerald-400"
+                            }`}>{sit.severity}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No operation timelines captured.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Operator Dispatch Alerts</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeNotificationCoordinator.getAlerts().length > 0 ? (
+                      [...activeNotificationCoordinator.getAlerts()].reverse().map(al => (
+                        <div key={al.id} className="bg-red-950/20 border border-red-900/40 p-2 rounded text-red-300 leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span>ALERT ({al.severity})</span>
+                            <span className="text-slate-500">{new Date(al.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                          <p className="text-[8px]">{al.message}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No operator alerts dispatched.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
