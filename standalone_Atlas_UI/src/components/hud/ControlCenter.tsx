@@ -92,6 +92,8 @@ import { activeIntentRepository } from "../../services/intelligence/repository/I
 import { activeIntentExplanationEngine } from "../../services/intelligence/explainability/IntentExplanationEngine";
 import { activeGoalHierarchy } from "../../services/intelligence/intent/GoalHierarchy";
 import type { EngineeringIntent } from "../../services/intelligence/intent/EngineeringIntent";
+import { activeAutonomousPlanner } from "../../services/intelligence/planning/AutonomousPlanner";
+import type { PlanningResult } from "../../services/intelligence/planning/AutonomousPlanner";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -120,6 +122,7 @@ type ActiveWorkspace =
   | "copilot"
   | "twinStudio"
   | "intentStudio"
+  | "planningStudio"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -228,6 +231,7 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [intentInputText, setIntentInputText] = useState("Optimize solar yield by 15% under grid voltage > 115V constraint");
   const [intentExplanation, setIntentExplanation] = useState<any>(null);
   const [intentValidationLogs, setIntentValidationLogs] = useState<string>("");
+  const [planningResult, setPlanningResult] = useState<PlanningResult | null>(null);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -948,6 +952,40 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleGenerateWorkflowPlans = () => {
+    if (!activeIntent) {
+      setIntentValidationLogs("Error: You must parse and validate an intent goal before generating workflow plans.");
+      return;
+    }
+    const result = activeAutonomousPlanner.plan(activeIntent);
+    setPlanningResult(result);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Autonomous Planner] Generated and ranked ${result.evaluations.length} visual workflow candidates.`
+    ]);
+  };
+
+  const handleLoadPlanIntoWorkflowStudio = (cand: any) => {
+    const newDef: VisualWorkflowDefinition = {
+      id: `wf-${cand.id}-${Date.now()}`,
+      name: cand.name,
+      version: "v1.0.0",
+      graph: cand.graph,
+      author: "EIOS Autonomous Planner",
+      updatedAt: new Date().toISOString()
+    };
+
+    activeVisualWorkflowRepository.saveDraft(newDef);
+    setSelectedWorkflowDef(newDef);
+    setActiveTab("workflows");
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Planner] Transferred plan "${cand.name}" directly into Visual Workflow Studio Canvas.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1131,6 +1169,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧠 Cognitive Intent Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("planningStudio")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "planningStudio"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🗺️ Cognitive Planning Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -3027,6 +3075,93 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       </div>
                     ) : (
                       <span className="text-slate-600 italic">No evidence traces calculated.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "planningStudio" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🗺️ COGNITIVE PLANNING & FEASIBILITY ENGINE</h3>
+                  <p className="text-[10px] text-slate-500">Decompose validated intent into alternative workflow candidates, evaluate multi-objective tradeoff matrix, and rank plans</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {activeIntent ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400">Validated Intent Goal:</span>
+                      <span className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[10.5px] font-mono text-cyan-300 max-w-[200px] truncate">{activeIntent.goal}</span>
+                      <button
+                        onClick={handleGenerateWorkflowPlans}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                      >
+                        Generate Workflow Plans
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-red-400 text-[10px] font-bold">Please parse and validate an intent first.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* Panel 1-3: Candidate Matrix (takes 3 cols) */}
+                <div className="col-span-3 p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Candidate Planning Alternatives Matrix</span>
+                  <div className="max-h-[220px] overflow-y-auto flex flex-col gap-2 mt-1">
+                    {planningResult ? (
+                      planningResult.evaluations.map((evalNode, idx) => (
+                        <div key={idx} className="bg-slate-900 p-2.5 border border-slate-800 rounded flex justify-between items-center gap-4">
+                          <div className="flex flex-col gap-1 w-2/3">
+                            <span className="font-bold text-slate-200 text-[10px]">{evalNode.candidate.name}</span>
+                            <div className="flex gap-3 text-slate-500 text-[8.5px] mt-0.5">
+                              <span>Cost: <strong className="text-cyan-300">${evalNode.candidate.costEstimateUSD}</strong></span>
+                              <span>Complexity: <strong className="text-yellow-400">{evalNode.candidate.complexityScore}/10</strong></span>
+                              <span>Accuracy: <strong className="text-purple-300">{evalNode.candidate.expectedAccuracy}%</strong></span>
+                              <span>Risk: <strong className={evalNode.tradeoffs.riskRating === "High" ? "text-red-400" : "text-emerald-400"}>{evalNode.tradeoffs.riskRating}</strong></span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 w-1/3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-400 text-[8.5px]">Rank Score:</span>
+                              <span className="text-cyan-300 font-bold text-xs">{evalNode.score.toFixed(0)}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                                evalNode.feasible ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                              }`}>{evalNode.feasible ? "Feasible" : "Infeasible"}</span>
+                              <button
+                                onClick={() => handleLoadPlanIntoWorkflowStudio(evalNode.candidate)}
+                                className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-800/40 rounded px-2 py-0.5 text-[8.5px] font-bold cursor-pointer"
+                              >
+                                Load into Studio
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No alternative workflow plans generated. Click "Generate Workflow Plans".</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Panel 4: Execution Advisor Advice */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">Planner Advisor Recommendations</span>
+                  <div className="mt-2 text-slate-300 leading-relaxed max-h-[200px] overflow-y-auto">
+                    {planningResult ? (
+                      <div className="flex flex-col gap-2.5">
+                        <p>{planningResult.recommendationAdvice}</p>
+                        <div className="border-t border-slate-850 pt-2 text-slate-500 text-[8px]">
+                          <strong>Tradeoff Ratio:</strong> Maximize Accuracy (Weight 0.7) vs Minimize Compute Complexity (Weight 0.3).
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-600 italic">Advisor metrics will calculate after planner runs.</span>
                     )}
                   </div>
                 </div>

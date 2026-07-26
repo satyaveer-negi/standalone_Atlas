@@ -12,6 +12,7 @@ import { activeTwinVerificationContributor } from "../../../../twin/verification
 import { activeDistributedTwinVerificationContributor } from "../../../../twin/distributed/verification/DistributedTwinVerificationContributor";
 import { activeWorkflowVerificationContributor } from "../../../../workflow/verification/WorkflowVerificationContributor";
 import { activeIntentVerificationContributor } from "../../../../intelligence/verification/IntentVerificationContributor";
+import { activePlanningVerificationContributor } from "../../../../intelligence/verification/PlanningVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -52,6 +53,10 @@ export class VerificationEngine {
     // Evaluate Cognitive Intent Intelligence checks
     const intentAsserts = activeIntentVerificationContributor.verifyIntentEcosystem();
     intentAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Cognitive Planning Intelligence checks
+    const planningAsserts = activePlanningVerificationContributor.verifyPlanningEcosystem();
+    planningAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
