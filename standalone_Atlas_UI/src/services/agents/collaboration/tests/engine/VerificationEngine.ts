@@ -11,6 +11,7 @@ import { Pillar5ComplianceTests } from "../compliance/Pillar5Tests";
 import { activeTwinVerificationContributor } from "../../../../twin/verification/TwinVerificationContributor";
 import { activeDistributedTwinVerificationContributor } from "../../../../twin/distributed/verification/DistributedTwinVerificationContributor";
 import { activeWorkflowVerificationContributor } from "../../../../workflow/verification/WorkflowVerificationContributor";
+import { activeIntentVerificationContributor } from "../../../../intelligence/verification/IntentVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -47,6 +48,10 @@ export class VerificationEngine {
     // Evaluate Workflow Composer & Cognitive Orchestration checks
     const workflowAsserts = activeWorkflowVerificationContributor.verifyWorkflowEcosystem();
     workflowAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Cognitive Intent Intelligence checks
+    const intentAsserts = activeIntentVerificationContributor.verifyIntentEcosystem();
+    intentAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

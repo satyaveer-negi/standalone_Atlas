@@ -86,6 +86,12 @@ import { activeScenarioComparator } from "../../services/workflow/scenarios/Scen
 import { WorkflowGraph } from "../../services/workflow/model/WorkflowGraph";
 import type { WorkflowDefinition as VisualWorkflowDefinition } from "../../services/workflow/model/WorkflowDefinition";
 import type { Scenario } from "../../services/workflow/scenarios/Scenario";
+import { activeIntentAssembler } from "../../services/intelligence/intent/IntentAssembler";
+import { activeIntentValidator } from "../../services/intelligence/intent/IntentValidator";
+import { activeIntentRepository } from "../../services/intelligence/repository/IntentRepository";
+import { activeIntentExplanationEngine } from "../../services/intelligence/explainability/IntentExplanationEngine";
+import { activeGoalHierarchy } from "../../services/intelligence/intent/GoalHierarchy";
+import type { EngineeringIntent } from "../../services/intelligence/intent/EngineeringIntent";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -113,6 +119,7 @@ type ActiveWorkspace =
   | "marketplace"
   | "copilot"
   | "twinStudio"
+  | "intentStudio"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -217,6 +224,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [explainabilityEvidence, setExplainabilityEvidence] = useState<any[]>([]);
   const [activeScenarios, setActiveScenarios] = useState<Scenario[]>([]);
   const [comparedMetrics, setComparedMetrics] = useState<any[]>([]);
+  const [activeIntent, setActiveIntent] = useState<EngineeringIntent | null>(null);
+  const [intentInputText, setIntentInputText] = useState("Optimize solar yield by 15% under grid voltage > 115V constraint");
+  const [intentExplanation, setIntentExplanation] = useState<any>(null);
+  const [intentValidationLogs, setIntentValidationLogs] = useState<string>("");
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -913,6 +924,30 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleParseEngineeringIntent = () => {
+    const intent = activeIntentAssembler.assembleIntent(intentInputText);
+    const validation = activeIntentValidator.validate(intent);
+    
+    if (validation.valid) {
+      intent.validationStatus = "Validated";
+      setIntentValidationLogs("Success: Intent parameters pass all physical boundary constraints checks.");
+      activeIntentRepository.saveIntent(intent);
+    } else {
+      intent.validationStatus = "Conflicting";
+      setIntentValidationLogs(`Conflict Error: ${validation.error}`);
+    }
+
+    const explanation = activeIntentExplanationEngine.generateExplanation(intent);
+    
+    setActiveIntent(intent);
+    setIntentExplanation(explanation);
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Intent Engine] Parsed intent ID ${intent.id} status transition: Draft -> ${intent.validationStatus}`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1086,6 +1121,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             ♊ Digital Twin Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("intentStudio")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "intentStudio"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧠 Cognitive Intent Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -2865,6 +2910,124 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         ))
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "intentStudio" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧠 COGNITIVE INTENT PARSER & ONTOLOGY STUDIO</h3>
+                  <p className="text-[10px] text-slate-500">Decompose user intent prompts, validate mathematical constraints parameters, and trace explainability ontologies</p>
+                </div>
+                <div className="flex items-center gap-2 w-1/2">
+                  <input
+                    type="text"
+                    value={intentInputText}
+                    onChange={(e) => setIntentInputText(e.target.value)}
+                    className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-[10.5px] font-mono text-cyan-300 focus:outline-none w-full"
+                  />
+                  <button
+                    onClick={handleParseEngineeringIntent}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Parse Intent Goal
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* Panel 1: Intent Info & Validator Logs */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Validation Status</span>
+                  {activeIntent ? (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Intent ID:</span>
+                        <span className="text-slate-300 truncate max-w-[80px] font-bold">{activeIntent.id}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Status:</span>
+                        <span className={`px-1 rounded text-[7.5px] font-bold ${
+                          activeIntent.validationStatus === "Validated" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"
+                        }`}>{activeIntent.validationStatus}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">Confidence:</span>
+                        <span className="text-purple-300 font-bold">{(activeIntent.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="mt-1 border-t border-slate-900 pt-1 text-slate-400 leading-tight">
+                        {intentValidationLogs}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-slate-600 italic">No parsed intent goals loaded.</span>
+                  )}
+                </div>
+
+                {/* Panel 2: Extracted Objectives */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Optimization Objectives</span>
+                  <div className="max-h-[130px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeIntent && activeIntent.objectives.length > 0 ? (
+                      activeIntent.objectives.map((obj, idx) => (
+                        <div key={idx} className="border-b border-slate-900 pb-1 last:border-0">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">{obj.propertyName}</span>
+                            <span className="text-slate-400">{obj.mode}</span>
+                          </div>
+                          <div className="text-slate-500 text-[8px] mt-0.5">Optimization weight: {obj.weight}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No optimization targets detected.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Panel 3: Extracted Constraints */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Boundary Constraints</span>
+                  <div className="max-h-[130px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {activeIntent && activeIntent.constraints.length > 0 ? (
+                      activeIntent.constraints.map(c => (
+                        <div key={c.id} className="border-b border-slate-900 pb-1 last:border-0">
+                          <div className="flex justify-between font-bold text-slate-300">
+                            <span>{c.name}</span>
+                            <span className="text-[7.5px] bg-slate-800 px-1 py-0.5 rounded text-slate-500">{c.category}</span>
+                          </div>
+                          <div className="text-slate-500 text-[8px] mt-0.5">Limit Value: {c.limitValue} ({c.expression})</div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No constraints extracted.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Panel 4: Explainability & Assumptions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. AI Parser Evidence Traces</span>
+                  <div className="max-h-[130px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {intentExplanation ? (
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <span className="text-cyan-400 font-bold text-[8.5px]">Ontology Entity Resolution:</span>
+                          <div className="text-slate-400 text-[8px] mt-0.5">{intentExplanation.entitiesRecognized.join(", ") || "None resolved"}</div>
+                        </div>
+                        <div>
+                          <span className="text-emerald-400 font-bold text-[8.5px]">Assumptions Made:</span>
+                          {intentExplanation.assumptionsMade.map((asm: string, idx: number) => (
+                            <p key={idx} className="text-slate-300 text-[8px] leading-tight mt-1">&rarr; {asm}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-slate-600 italic">No evidence traces calculated.</span>
+                    )}
                   </div>
                 </div>
               </div>
