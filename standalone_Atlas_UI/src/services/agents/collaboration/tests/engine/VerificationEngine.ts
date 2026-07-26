@@ -20,6 +20,7 @@ import { activeRuntimeVerificationContributor } from "../../../../intelligence/v
 import { activeGovernanceVerificationContributor } from "../../../../intelligence/verification/GovernanceVerificationContributor";
 import { activeSynthesisVerificationContributor } from "../../../../intelligence/verification/SynthesisVerificationContributor";
 import { activeEvolutionVerificationContributor } from "../../../../intelligence/verification/EvolutionVerificationContributor";
+import { activeMetaCognitiveVerificationContributor } from "../../../../intelligence/verification/MetaCognitiveVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -92,6 +93,10 @@ export class VerificationEngine {
     // Evaluate Autonomous Engineering Evolution checks
     const evolutionAsserts = activeEvolutionVerificationContributor.verifyEvolutionEcosystem();
     evolutionAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Meta-Cognitive Engineering checks
+    const metaAsserts = activeMetaCognitiveVerificationContributor.verifyMetaCognitiveEcosystem();
+    metaAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

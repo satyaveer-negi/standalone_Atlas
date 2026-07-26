@@ -143,6 +143,13 @@ import { activeEvolutionRepository } from "../../services/intelligence/repositor
 import type { EvolutionProposal } from "../../services/intelligence/evolution/EvolutionProposal";
 import type { EvolutionImpactAssessment } from "../../services/intelligence/evolution/EvolutionImpactAssessment";
 import type { EvolutionExperiment } from "../../services/intelligence/evolution/EvolutionExperiment";
+import { activeMetaCognitiveOrchestrator } from "../../services/intelligence/meta/MetaCognitiveOrchestrator";
+import { activeMetaCognitiveEvaluator } from "../../services/intelligence/meta/MetaCognitiveEvaluator";
+import { activeMetaCognitiveRepository } from "../../services/intelligence/repository/MetaCognitiveRepository";
+import type { MetaCognitiveAssessment } from "../../services/intelligence/meta/MetaCognitiveAssessment";
+import type { CognitiveBenchmark } from "../../services/intelligence/meta/CognitiveBenchmark";
+import type { CognitiveEpisode } from "../../services/intelligence/meta/CognitiveEpisode";
+import type { CognitiveHealth } from "../../services/intelligence/meta/MetaCognitiveEvaluator";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -179,6 +186,7 @@ type ActiveWorkspace =
   | "operationalGovernance"
   | "knowledgeSynthesis"
   | "engineeringEvolution"
+  | "metaCognitive"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -307,6 +315,10 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [evolutionProposals, setEvolutionProposals] = useState<EvolutionProposal[]>([]);
   const [evolutionAssessments, setEvolutionAssessments] = useState<EvolutionImpactAssessment[]>([]);
   const [evolutionExperiments, setEvolutionExperiments] = useState<EvolutionExperiment[]>([]);
+  const [metaAssessments, setMetaAssessments] = useState<MetaCognitiveAssessment[]>([]);
+  const [metaBenchmarks, setMetaBenchmarks] = useState<CognitiveBenchmark[]>(activeMetaCognitiveRepository.getBenchmarksList());
+  const [metaEpisodes, setMetaEpisodes] = useState<CognitiveEpisode[]>([]);
+  const [metaHealth, setMetaHealth] = useState<CognitiveHealth>(activeMetaCognitiveRepository.getHealth());
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1375,6 +1387,37 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     }
   };
 
+  const handleTriggerCognitiveAudit = () => {
+    const audits = activeMetaCognitiveOrchestrator.runCognitiveAudit();
+    const healthScore = activeMetaCognitiveEvaluator.evaluateOverallHealth(audits);
+
+    audits.forEach(ass => activeMetaCognitiveRepository.saveAssessment(ass));
+    activeMetaCognitiveRepository.updateHealth(healthScore);
+
+    const ep: CognitiveEpisode = {
+      episodeId: `ep-${Date.now()}`,
+      questionText: "Audit cognitive components reasoning quality trends.",
+      reasoningPath: [
+        "Planner accuracy checked against EIOS verification suite",
+        "Negotiation consensus metrics checked for CDF and safety domains reviews"
+      ],
+      decisionFormulated: `Formulated cognitive health profile (Overall Score: ${healthScore.overallHealthScore}%).`,
+      outcomeResultText: healthScore.driftDetected ? "Drift warning active" : "Cognitive parameters stable",
+      overallScore: healthScore.overallHealthScore
+    };
+
+    activeMetaCognitiveRepository.addEpisode(ep);
+
+    setMetaAssessments(activeMetaCognitiveRepository.getAssessmentsList());
+    setMetaHealth(activeMetaCognitiveRepository.getHealth());
+    setMetaEpisodes(activeMetaCognitiveRepository.getEpisodesList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Meta-Cognitive Audit] Completed audit. Cognitive Health: ${healthScore.overallHealthScore}%. Drift status: ${healthScore.driftDetected ? "DRIFT DETECTED" : "NOMINAL"}`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -1638,6 +1681,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧬 Engineering Evolution
+          </button>
+          <button
+            onClick={() => setActiveTab("metaCognitive")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "metaCognitive"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧠 Meta-Cognitive Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -4828,6 +4881,131 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-600 italic">No experiments registered.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "metaCognitive" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧠 META-COGNITIVE STUDIO & HEALTH MONITOR</h3>
+                  <p className="text-[10px] text-slate-500">Audit overall reasoning quality, evaluate longitudinal cognitive benchmarks, track drift indicators, and identify opportunities for platform evolution</p>
+                </div>
+                <div>
+                  <button
+                    onClick={handleTriggerCognitiveAudit}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Run Cognitive Audit
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Cognitive Health Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Cognitive Health Profile</span>
+                  <div className="flex flex-col gap-2 mt-1 leading-tight text-slate-400">
+                    <div className="flex justify-between items-center bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span>Overall Health Index:</span>
+                      <strong className="text-cyan-300 text-xs">{metaHealth.overallHealthScore}%</strong>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span>Cognitive Drift Alert:</span>
+                      <strong className={metaHealth.driftDetected ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+                        {metaHealth.driftDetected ? "DRIFT DETECTED" : "NOMINAL"}
+                      </strong>
+                    </div>
+                    <div className="text-[7.5px] text-slate-500 border-t border-slate-900 pt-2 leading-normal">
+                      Monitors performance levels across Planning, Reasoning, retrieval, governance, and learning capabilities.
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Longitudinal Benchmarks */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Cognitive Performance Benchmarks</span>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    {metaBenchmarks.map(b => (
+                      <div key={b.benchmarkId} className="bg-slate-900 p-1.5 border border-slate-850 rounded leading-normal">
+                        <span className="font-bold text-slate-200 block truncate">{b.name}</span>
+                        <div className="flex justify-between text-slate-500 text-[8px] mt-1">
+                          <span>Current: <strong className="text-cyan-300">{b.currentScore}%</strong></span>
+                          <span>Trend: <strong className="text-emerald-450">{b.trend}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Priority Action Items */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Priority Cognitive Actions</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    <div className="bg-slate-900 p-2 border border-slate-850 rounded">
+                      <span className="text-orange-400 block font-bold text-[8px] uppercase">Heuristics Drift</span>
+                      <p className="text-slate-400 text-[8.5px] leading-normal mt-0.5">
+                        Upgrade Evolution pre-reviews rules.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Assessments ledger and episodic diagnostics */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Meta-Cognitive Assessments Registry</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {metaAssessments.length > 0 ? (
+                      [...metaAssessments].reverse().map(ass => (
+                        <div key={ass.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">{ass.component} Assessment</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              Opportunities: "{ass.improvementOpportunities.join(", ")}"
+                            </div>
+                            <div className="text-[7.5px] text-slate-500 truncate mt-0.5">
+                              Evidence: {ass.evidenceSnapshot}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              ass.reasoningQuality === "Nominal" ? "bg-emerald-950 text-emerald-450" : "bg-yellow-950 text-yellow-450"
+                            }`}>{ass.reasoningQuality}</span>
+                            <span className="text-cyan-300 font-bold block text-[10px]">{ass.performanceScore}%</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No assessments registered. Run cognitive audit cycle.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Reasoning Episodes Log</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {metaEpisodes.length > 0 ? (
+                      [...metaEpisodes].reverse().map(ep => (
+                        <div key={ep.episodeId} className="bg-slate-900 p-2 border border-slate-850 rounded text-slate-400 leading-normal">
+                          <span className="font-bold text-cyan-300 text-[8px]">Session ID: {ep.episodeId}</span>
+                          <p className="text-[8px] text-slate-500 mt-1">{ep.questionText}</p>
+                          <div className="text-[7.5px] text-purple-400 mt-1 leading-normal">
+                            Path: {ep.reasoningPath.join(" → ")}
+                          </div>
+                          <p className="text-[8px] font-bold text-slate-300 mt-1">{ep.decisionFormulated}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-600 italic">No reasoning episodes recorded in this session.</span>
                     )}
                   </div>
                 </div>
