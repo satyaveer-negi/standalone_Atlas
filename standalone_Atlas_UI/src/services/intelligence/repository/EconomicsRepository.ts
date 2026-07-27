@@ -1,8 +1,8 @@
-import { EngineeringValueModel } from "../economics/EngineeringValueModel";
-import { BenefitRealizationPlan } from "../economics/BenefitRealizationPlan";
-import { PortfolioValueAssessment } from "../economics/PortfolioValueAssessment";
-import { EconomicScenario } from "../economics/EconomicScenario";
-import { ValueForecast } from "../economics/ValueForecast";
+import type { EngineeringValueModel } from "../economics/EngineeringValueModel";
+import type { BenefitRealizationPlan } from "../economics/BenefitRealizationPlan";
+import type { PortfolioValueAssessment } from "../economics/PortfolioValueAssessment";
+import type { EconomicScenario } from "../economics/EconomicScenario";
+import type { ValueForecast } from "../economics/ValueForecast";
 
 export class EconomicsRepository {
   private valueModels = new Map<string, EngineeringValueModel>();

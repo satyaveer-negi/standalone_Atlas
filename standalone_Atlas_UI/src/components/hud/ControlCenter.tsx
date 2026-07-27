@@ -247,6 +247,12 @@ import type { AdaptiveCapabilityPortfolio } from "../../services/intelligence/ev
 import type { EvolutionAssessment } from "../../services/intelligence/evolution/EvolutionAssessment";
 import type { EvolutionScenario } from "../../services/intelligence/evolution/EvolutionScenario";
 import type { EvolutionRecommendation } from "../../services/intelligence/evolution/EvolutionRecommendation";
+import { activeOrchestrationRepository } from "../../services/intelligence/repository/OrchestrationRepository";
+import type { EnterpriseIntelligenceModel } from "../../services/intelligence/orchestration/EnterpriseIntelligenceModel";
+import type { AutonomousDecisionOrchestrator } from "../../services/intelligence/orchestration/AutonomousDecisionOrchestrator";
+import type { EnterpriseStateAssessment } from "../../services/intelligence/orchestration/EnterpriseStateAssessment";
+import type { EnterpriseSimulation } from "../../services/intelligence/orchestration/EnterpriseSimulation";
+import type { ConstitutionalEvolutionRecommendation } from "../../services/intelligence/orchestration/ConstitutionalEvolutionRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -498,6 +504,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [evolutionAssessments, setEvolutionAssessments] = useState<EvolutionAssessment[]>([]);
   const [evolutionScenarios, setEvolutionScenarios] = useState<EvolutionScenario[]>([]);
   const [evolutionRecommendations, setEvolutionRecommendations] = useState<EvolutionRecommendation[]>([]);
+  const [enterpriseModels, setEnterpriseModels] = useState<EnterpriseIntelligenceModel[]>([]);
+  const [coordinatedDecisions, setCoordinatedDecisions] = useState<AutonomousDecisionOrchestrator[]>([]);
+  const [stateAssessments, setStateAssessments] = useState<EnterpriseStateAssessment[]>([]);
+  const [enterpriseSimulations, setEnterpriseSimulations] = useState<EnterpriseSimulation[]>([]);
+  const [constitutionalRecommendations, setConstitutionalRecommendations] = useState<ConstitutionalEvolutionRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -3488,6 +3499,128 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerOrchestrationSetup = () => {
+    const orchestrationId = `orch-${Date.now()}`;
+
+    // 1. Enterprise Intelligence Models
+    const model: EnterpriseIntelligenceModel = {
+      orchestrationId,
+      synthesizedAt: new Date().toISOString(),
+      activeStrategiesCount: 3,
+      totalActivePrograms: 5,
+      averageMaturityLevel: 4.2,
+      ecosystemTrustIndex: 88,
+      innovationVelocity: 85,
+      overallAdaptabilityScore: 82,
+      contributingContexts: [
+        {
+          context: "EvolutionStrategyModel",
+          snapshotId: "strat-mock-01-snap",
+          timestamp: new Date().toISOString()
+        }
+      ],
+      status: "Synchronized"
+    };
+    activeOrchestrationRepository.saveModel(model);
+
+    // 2. Autonomous Decision Orchestrator
+    const decision: AutonomousDecisionOrchestrator = {
+      decisionId: `dec-${Date.now()}`,
+      decisionName: "Federated Grid Digital Twin Deployment Action Plan",
+      proposedActions: [
+        {
+          domainName: "Ecosystem",
+          recommendationId: "rec-eco-mock-01",
+          priority: "Critical",
+          resourceRequirements: [{ resourceType: "Budget", amount: 50000 }]
+        },
+        {
+          domainName: "Evolution",
+          recommendationId: "rec-evo-mock-01",
+          priority: "High",
+          resourceRequirements: [{ resourceType: "Budget", amount: 45000 }]
+        }
+      ],
+      decisionConstraints: [
+        {
+          constraint: "Regulatory Compliance Audit Checkpoint",
+          source: "Governance Policy v2"
+        }
+      ],
+      reconciliationStatus: "Reconciled",
+      conflictNotes: [],
+      actionStatus: "Draft"
+    };
+    activeOrchestrationRepository.saveOrchestration(decision);
+
+    // 3. Enterprise State Assessment
+    const ea: EnterpriseStateAssessment = {
+      assessmentId: `assess-orch-${Date.now()}`,
+      evaluationPeriod: "FY26-Q4",
+      constitutionalComplianceScore: 95.0,
+      strategicAlignmentScore: 92.0,
+      coherenceIndex: 90.0,
+      operationalHealthScore: 88.0,
+      decisionConsistencyScore: 92.0,
+      assessmentDate: new Date().toISOString()
+    };
+    activeOrchestrationRepository.saveAssessment(ea);
+
+    // Refresh UI States
+    setEnterpriseModels(activeOrchestrationRepository.getModelsList());
+    setCoordinatedDecisions(activeOrchestrationRepository.getOrchestrationsList());
+    setStateAssessments(activeOrchestrationRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Orchestration Setup] Unified enterprise model synchronized. Compliance: ${ea.constitutionalComplianceScore}%, Coherence Index: ${ea.coherenceIndex}%, Decision Consistency: ${ea.decisionConsistencyScore}%.`
+    ]);
+  };
+
+  const handleTriggerOrchestrationSimulation = () => {
+    // 1. Enterprise Simulation
+    const simulationId = `sim-orch-${Date.now()}`;
+    const es: EnterpriseSimulation = {
+      simulationId,
+      name: "Autonomous Synchronization Integration Path",
+      description: "Model cross-domain orchestration efficiency impact",
+      simulatedMaturityGain: 15.0,
+      coherenceImprovement: 12.0,
+      estimatedTransitionTimeMonths: 6,
+      coordinationRiskIndex: 22.0,
+      projectedSavings: 85000,
+      constitutionalStressLevel: "Low",
+      simulationStatus: "Simulated"
+    };
+    activeOrchestrationRepository.saveSimulation(es);
+
+    // 2. Constitutional Recommendation
+    const recommendationId = `rec-con-${Date.now()}`;
+    const rec: ConstitutionalEvolutionRecommendation = {
+      recommendationId,
+      recommendationType: "ConstitutionalAmendment",
+      rationale: "Amends grid synchronization guidelines to authorize cross-ecosystem telemetry",
+      confidenceScore: 96.0,
+      evidenceSources: ["rec-evo-mock-01"],
+      estimatedBenefit: {
+        coherenceGain: 15.0,
+        complianceImprovement: 10.0,
+        riskReduction: 20.0
+      },
+      recommendationStatus: "Proposed"
+    };
+    activeOrchestrationRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setEnterpriseSimulations(activeOrchestrationRepository.getSimulationsList());
+    setConstitutionalRecommendations(activeOrchestrationRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Orchestration simulation] Proposed Constitutional recommendation: ${rec.recommendationType} (Compliance Gain: +${rec.estimatedBenefit.complianceImprovement}%, Confidence: ${rec.confidenceScore}%). Simulated scenario constitutional stress level: ${es.constitutionalStressLevel}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3901,6 +4034,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧬 Evolution Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("orchestrationNetwork")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "orchestrationNetwork"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🛡️ Orchestration Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -10395,6 +10538,263 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                                 <strong>Trace:</strong> {rec.evidenceSources.map(s => `${s.sourceId} (${s.sourceType})`).join(", ")}
                               </div>
                             </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No trace lineage logs.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "orchestrationNetwork" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🛡️ ENTERPRISE INTELLIGENCE ORCHESTRATION & CONSTITUTIONAL CONSOLE</h3>
+                  <p className="text-[10px] text-slate-505">Harmonizing strategic, economic, ecosystem, innovation, and evolution recommendations under constitutional checks</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerOrchestrationSetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Orchestration Model
+                  </button>
+                  <button
+                    onClick={handleTriggerOrchestrationSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Orchestration
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Enterprise */}
+              <div className="border-l-2 border-cyan-500/50 pl-2">
+                <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block mb-2">I. Enterprise State & Provenance</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Enterprise State */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">1. Enterprise State Synthesized</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450">
+                      {enterpriseModels.length > 0 ? (
+                        [...enterpriseModels].reverse().map(m => (
+                          <div key={m.orchestrationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-cyan-300">
+                              <span>Maturity: Level {m.averageMaturityLevel}</span>
+                              <span className="text-emerald-450">{m.status}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-500 space-y-0.5 font-sans">
+                              <div>Active Strategies: {m.activeStrategiesCount}</div>
+                              <div>Active Programs: {m.totalActivePrograms}</div>
+                              <div>Ecosystem Trust: {m.ecosystemTrustIndex}%</div>
+                              <div>Innovation Velocity: {m.innovationVelocity}%</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No enterprise models synthesized. Click Deploy Orchestration Model.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Maturity Overview */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">2. State & Adaptability Index</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {enterpriseModels.length > 0 ? (
+                        [...enterpriseModels].reverse().map(m => (
+                          <div key={m.orchestrationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7.5px]">
+                            <div>Overall Adaptability: <strong className="text-emerald-450">{m.overallAdaptabilityScore}%</strong></div>
+                            <div className="text-slate-500 text-[7px] mt-1 font-sans">
+                              Synchronized at: {new Date(m.synthesizedAt).toLocaleTimeString()}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No metrics synced.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Provenance Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">3. Provenance Explorer</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450 font-sans">
+                      {enterpriseModels.length > 0 ? (
+                        [...enterpriseModels].reverse().map(m => (
+                          <div key={m.orchestrationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7px]">
+                            {m.contributingContexts.map((prov, idx) => (
+                              <div key={idx} className="bg-slate-950 p-1 rounded flex flex-col gap-0.5">
+                                <span className="font-bold text-purple-400">{prov.context}</span>
+                                <span className="text-slate-550">Snap: {prov.snapshotId.substring(0, 15)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No context snapshots traced.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Decisions */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">II. Coordinated Decisions & Constraint Explorer</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Decision Matrix */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">4. Autonomous Decision Matrix</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal">
+                      {coordinatedDecisions.length > 0 ? (
+                        coordinatedDecisions.map(dec => (
+                          <div key={dec.decisionId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="font-bold text-cyan-300 text-[8.5px]">{dec.decisionName}</span>
+                            <div className="space-y-1.5 mt-1 border-t border-slate-850 pt-1 text-[7px] text-slate-400 font-sans">
+                              <div className="flex justify-between items-center text-[7.5px] bg-slate-950 p-1 rounded">
+                                <span>Status: {dec.reconciliationStatus}</span>
+                                <span className="text-purple-400">Action: {dec.actionStatus}</span>
+                              </div>
+                              {dec.proposedActions.map((act, idx) => (
+                                <div key={idx} className="flex justify-between items-center bg-slate-950 p-1 rounded text-[6.5px]">
+                                  <span>{act.domainName} ➔ {act.recommendationId.substring(0, 10)}</span>
+                                  <span className="text-emerald-450 font-bold">{act.priority}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No coordinated decisions synchronized. Click Deploy Orchestration Model.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Constraint Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">5. Constraint Explorer</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {coordinatedDecisions.length > 0 ? (
+                        [...coordinatedDecisions].reverse().map(dec => (
+                          <div key={dec.decisionId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5 font-sans text-[7px]">
+                            {dec.decisionConstraints.map((c, idx) => (
+                              <div key={idx} className="bg-slate-950 p-1 rounded flex flex-col gap-0.5">
+                                <span className="font-bold text-purple-400">{c.constraint}</span>
+                                <span className="text-slate-500">Source: {c.source}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No active constraints.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Compliance */}
+              <div className="border-l-2 border-emerald-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block mb-2">III. Compliance & Coherence Analysis</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Compliance Indicators */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">6. Constitutional Compliance Tracker</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {stateAssessments.length > 0 ? (
+                        [...stateAssessments].reverse().map(ea => (
+                          <div key={ea.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center text-[7.5px]">
+                            <div>
+                              <span className="font-bold text-cyan-300 text-[8.5px] block">{ea.evaluationPeriod} Evaluation</span>
+                              <div className="text-[7px] text-slate-500 mt-1">
+                                <div>Strategic Alignment: {ea.strategicAlignmentScore}%</div>
+                                <div>Operational Health: {ea.operationalHealthScore}%</div>
+                                <div>Decision Consistency: <strong className="text-emerald-450">{ea.decisionConsistencyScore}%</strong></div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">Compliance: {ea.constitutionalComplianceScore}%</span>
+                              <span className="text-slate-550 text-[7px] block">Coherence Index: {ea.coherenceIndex}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No compliance assessments history recorded.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Simulators */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">7. Enterprise Simulation</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {enterpriseSimulations.length > 0 ? (
+                        [...enterpriseSimulations].reverse().map(os => (
+                          <div key={os.simulationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{os.name}</span>
+                              <span className="text-purple-400">Stress: {os.constitutionalStressLevel}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1.5 space-y-0.5 font-sans">
+                              <div>Projected Savings: <strong className="text-emerald-450">${os.projectedSavings}</strong></div>
+                              <div>Maturity Gain: +{os.simulatedMaturityGain}%</div>
+                              <div>Coherence Gain: +{os.coherenceImprovement}%</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No transition scenarios simulated.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Recommendations */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">IV. Constitutional Recommendations & Evidence Trace</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Recommendations Queue */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">8. Constitutional recommendations Queue</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {constitutionalRecommendations.length > 0 ? (
+                        constitutionalRecommendations.map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{rec.recommendationType}</span>
+                              <span className="text-purple-400">{rec.recommendationStatus}</span>
+                            </div>
+                            <p className="text-[7.5px] text-slate-450 italic mt-1">"{rec.rationale}"</p>
+                            <div className="border-t border-slate-800 pt-1.5 mt-1.5 text-[7px] text-slate-500 grid grid-cols-2 gap-1.5">
+                              <div>Confidence: <strong className="text-emerald-400">{rec.confidenceScore}%</strong></div>
+                              <div>Coherence Gain: +{rec.estimatedBenefit.coherenceGain}%</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No constitutional recommendations proposed.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Trace Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">9. Trace Explorer</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400 font-sans">
+                      {constitutionalRecommendations.length > 0 ? (
+                        [...constitutionalRecommendations].reverse().map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7.5px]">
+                            <div>Evidence Traces: <strong className="text-purple-400">{rec.evidenceSources.join(", ")}</strong></div>
                           </div>
                         ))
                       ) : (

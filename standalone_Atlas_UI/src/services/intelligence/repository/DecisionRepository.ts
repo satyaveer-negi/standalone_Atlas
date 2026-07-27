@@ -1,4 +1,4 @@
-import { EngineeringRecommendation } from "../decision/EngineeringRecommendation";
+import type { EngineeringRecommendation } from "../decision/EngineeringRecommendation";
 
 export class DecisionRepository {
   private recommendations = new Map<string, EngineeringRecommendation>();
