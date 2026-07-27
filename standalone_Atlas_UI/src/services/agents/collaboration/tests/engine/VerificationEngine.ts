@@ -35,6 +35,7 @@ import { activeAdaptiveGovernanceVerificationContributor } from "../../../../int
 import { activeOrganizationVerificationContributor } from "../../../../intelligence/verification/OrganizationVerificationContributor";
 import { activeEcosystemVerificationContributor } from "../../../../intelligence/verification/EcosystemVerificationContributor";
 import { activeInnovationVerificationContributor } from "../../../../intelligence/verification/InnovationVerificationContributor";
+import { activeEvolutionVerificationContributor } from "../../../../intelligence/verification/EvolutionVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -167,6 +168,10 @@ export class VerificationEngine {
     // Evaluate Knowledge & Innovation Intelligence checks
     const innovationAsserts = activeInnovationVerificationContributor.verifyInnovation();
     innovationAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Autonomous Enterprise Evolution checks
+    const evolutionAsserts = activeEvolutionVerificationContributor.verifyEvolution();
+    evolutionAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

@@ -241,6 +241,12 @@ import type { InnovationProgram } from "../../services/intelligence/innovation/I
 import type { KnowledgeExchangeAssessment } from "../../services/intelligence/innovation/KnowledgeExchangeAssessment";
 import type { InnovationScenario } from "../../services/intelligence/innovation/InnovationScenario";
 import type { InnovationRecommendation } from "../../services/intelligence/innovation/InnovationRecommendation";
+import { activeEvolutionRepository } from "../../services/intelligence/repository/EvolutionRepository";
+import type { EvolutionStrategyModel } from "../../services/intelligence/evolution/EvolutionStrategyModel";
+import type { AdaptiveCapabilityPortfolio } from "../../services/intelligence/evolution/AdaptiveCapabilityPortfolio";
+import type { EvolutionAssessment } from "../../services/intelligence/evolution/EvolutionAssessment";
+import type { EvolutionScenario } from "../../services/intelligence/evolution/EvolutionScenario";
+import type { EvolutionRecommendation } from "../../services/intelligence/evolution/EvolutionRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -487,6 +493,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [knowledgeExchangeAssessments, setKnowledgeExchangeAssessments] = useState<KnowledgeExchangeAssessment[]>([]);
   const [innovationScenarios, setInnovationScenarios] = useState<InnovationScenario[]>([]);
   const [innovationRecommendations, setInnovationRecommendations] = useState<InnovationRecommendation[]>([]);
+  const [evolutionStrategies, setEvolutionStrategies] = useState<EvolutionStrategyModel[]>([]);
+  const [capabilityPortfolios, setCapabilityPortfolios] = useState<AdaptiveCapabilityPortfolio[]>([]);
+  const [evolutionAssessments, setEvolutionAssessments] = useState<EvolutionAssessment[]>([]);
+  const [evolutionScenarios, setEvolutionScenarios] = useState<EvolutionScenario[]>([]);
+  const [evolutionRecommendations, setEvolutionRecommendations] = useState<EvolutionRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -3359,6 +3370,124 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerEvolutionSetup = () => {
+    const strategyId = `strat-${Date.now()}`;
+
+    // 1. Evolution Strategy Models
+    const strategy: EvolutionStrategyModel = {
+      strategyId,
+      strategyName: "Enterprise Digital Twin Autonomy Evolution Plan",
+      targetStateVision: "Achieve PEML 100 Autonomous Governance & Ecosystem Interoperability",
+      evolutionHorizon: "Horizon3",
+      capabilityPathways: [
+        {
+          capabilityName: "Autonomous Scenario Replay Simulation",
+          targetMaturityLevel: 5,
+          estimatedTimeframeMonths: 18,
+          dependencies: ["Ecosystem Federation Data Bridge"]
+        },
+        {
+          capabilityName: "Ecosystem Federation Data Bridge",
+          targetMaturityLevel: 4,
+          estimatedTimeframeMonths: 9,
+          dependencies: []
+        }
+      ],
+      strategicFocusArea: "EcosystemLeadership",
+      status: "Active"
+    };
+    activeEvolutionRepository.saveStrategy(strategy);
+
+    // 2. Adaptive Capability Portfolio
+    const portfolio: AdaptiveCapabilityPortfolio = {
+      portfolioId: `port-${Date.now()}`,
+      capabilityName: "Ecosystem Federation Data Bridge",
+      currentMaturity: 2,
+      targetMaturity: 4,
+      adoptionReadinessScore: 78,
+      investmentPriority: "Critical",
+      adaptationCost: 120000,
+      governanceWaiverApproved: false,
+      lastReviewedDate: new Date().toISOString()
+    };
+    activeEvolutionRepository.savePortfolio(portfolio);
+
+    // 3. Evolution Assessment
+    const ea: EvolutionAssessment = {
+      assessmentId: `assess-evo-${Date.now()}`,
+      evaluationPeriod: "Q4-2026",
+      adaptabilityIndex: 82.0,
+      disruptionResilienceScore: 85.0,
+      evolutionaryVelocity: 22.5,
+      organizationalLearningRate: 75.0,
+      sustainabilityIndex: 80.0,
+      fitnessTrend: "Improving",
+      assessmentDate: new Date().toISOString()
+    };
+    activeEvolutionRepository.saveAssessment(ea);
+
+    // Refresh UI States
+    setEvolutionStrategies(activeEvolutionRepository.getStrategiesList());
+    setCapabilityPortfolios(activeEvolutionRepository.getPortfoliosList());
+    setEvolutionAssessments(activeEvolutionRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Evolution Setup] Deployed strategy evolution plan: Horizon 3. Assessed enterprise fitness adaptability: ${ea.adaptabilityIndex}%, Learning Rate: ${ea.organizationalLearningRate}%.`
+    ]);
+  };
+
+  const handleTriggerEvolutionSimulation = () => {
+    // 1. Evolution Scenario
+    const scenarioId = `scen-evo-${Date.now()}`;
+    const es: EvolutionScenario = {
+      scenarioId,
+      name: "Global Energy Transition Volatility Scenario",
+      description: "Model grid integration shifts and changing regulatory environments stability",
+      simulatedTechConvergenceRate: 65.0,
+      projectedMarketShiftSeverity: "High",
+      regulatoryVolatility: "Medium",
+      organizationalAdaptationTimeMonths: 12,
+      transitionRiskIndex: 32.0,
+      expectedCostSaving: 140000,
+      scenarioStatus: "Simulated"
+    };
+    activeEvolutionRepository.saveScenario(es);
+
+    // 2. Evolution Recommendation
+    const recommendationId = `rec-evo-${Date.now()}`;
+    const rec: EvolutionRecommendation = {
+      recommendationId,
+      recommendationType: "CapabilityAcquisition",
+      strategyId: "strat-mock-01",
+      rationale: "Onboards Ecosystem Federation Data Bridge to resolve communication overhead gaps",
+      confidenceScore: 94.0,
+      evidenceSources: [
+        {
+          sourceId: "inno-assert-trl-bounds",
+          sourceType: "Innovation",
+          timestamp: new Date().toISOString()
+        }
+      ],
+      estimatedBenefit: {
+        adaptabilityGain: 18.0,
+        transitionRiskReduction: 15.0,
+        costSavings: 45000
+      },
+      recommendationStatus: "Proposed"
+    };
+    activeEvolutionRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setEvolutionScenarios(activeEvolutionRepository.getScenariosList());
+    setEvolutionRecommendations(activeEvolutionRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Evolution simulation] Proposed Evolution recommendation: ${rec.recommendationType} (Adaptability Gain: +${rec.estimatedBenefit.adaptabilityGain}%, Confidence: ${rec.confidenceScore}%). Simulated scenario regulatory volatility: ${es.regulatoryVolatility}, transition risk index: ${es.transitionRiskIndex}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3762,6 +3891,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             💡 Innovation Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("evolutionNetwork")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "evolutionNetwork"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧬 Evolution Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -9992,6 +10131,268 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                               <div>Domain ID: <strong className="text-purple-400">{rec.domainId}</strong></div>
                               <div className="border-t border-slate-850 pt-1">
                                 <strong>Trace:</strong> {rec.evidenceSources.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No trace lineage logs.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "evolutionNetwork" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧬 ENTERPRISE AUTONOMOUS EVOLUTION & ADAPTIVE INTELLIGENCE STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Managing long-term strategy horizons, capability pathways, maturity gaps, transition risks, and regulatory volatilities</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerEvolutionSetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Strategy Matrix
+                  </button>
+                  <button
+                    onClick={handleTriggerEvolutionSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Evolution
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Strategy */}
+              <div className="border-l-2 border-cyan-500/50 pl-2">
+                <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block mb-2">I. Strategy Horizons & Pathways</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Strategy Horizons */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">1. Horizon Planner</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450">
+                      {evolutionStrategies.length > 0 ? (
+                        [...evolutionStrategies].reverse().map(strat => (
+                          <div key={strat.strategyId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-cyan-300 font-bold">{strat.strategyName}</span>
+                            <div className="flex justify-between text-[7px] text-slate-450 mt-1">
+                              <span>Horizon: {strat.evolutionHorizon}</span>
+                              <span className={`font-bold ${
+                                strat.status === "Active" ? "text-emerald-450" : "text-purple-400"
+                              }`}>{strat.status}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No strategies registered. Click Deploy Strategy Matrix.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Capability Pathways */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">2. Capability Pathways</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {evolutionStrategies.length > 0 ? (
+                        [...evolutionStrategies].reverse().map(strat => (
+                          <div key={strat.strategyId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5 font-sans text-[7px]">
+                            <div className="text-[7.5px] text-slate-450 space-y-1">
+                              {strat.capabilityPathways.map((path, idx) => (
+                                <div key={idx} className="bg-slate-950 p-1 rounded flex justify-between">
+                                  <span>{path.capabilityName}</span>
+                                  <strong className="text-emerald-450">TRL {path.targetMaturityLevel}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No pathways mapped.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dependency Graph */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">3. Pathway Dependencies</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450 font-sans">
+                      {evolutionStrategies.length > 0 ? (
+                        [...evolutionStrategies].reverse().map(strat => (
+                          <div key={strat.strategyId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7px]">
+                            {strat.capabilityPathways.map((path, idx) => (
+                              <div key={idx} className="bg-slate-950/40 p-1 rounded flex flex-col gap-0.5">
+                                <span className="font-bold text-cyan-300">{path.capabilityName}</span>
+                                <span className="text-slate-500">Depends: {path.dependencies.length > 0 ? path.dependencies.join(", ") : "None"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No dependencies modeled.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Capability */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">II. Adaptive Capability Portfolio & Gaps</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Portfolio List */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">4. Portfolio & Gap Analysis</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal">
+                      {capabilityPortfolios.length > 0 ? (
+                        capabilityPortfolios.map(port => (
+                          <div key={port.portfolioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="font-bold text-cyan-300 text-[8.5px]">{port.capabilityName}</span>
+                            <div className="space-y-1.5 mt-1 border-t border-slate-850 pt-1 text-[7px] text-slate-400 font-sans">
+                              <div className="flex justify-between items-center text-[7.5px] bg-slate-950 p-1 rounded">
+                                <span>Current: Lvl {port.currentMaturity}</span>
+                                <span className="text-purple-400">Target: Lvl {port.targetMaturity}</span>
+                              </div>
+                              <div className="flex justify-between text-[7px] text-slate-500 mt-1">
+                                <span>Readiness: {port.adoptionReadinessScore}%</span>
+                                <span>Priority: {port.investmentPriority}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No active capability portfolio. Click Deploy Strategy Matrix.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Prioritization */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">5. Investment Priorities</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {capabilityPortfolios.length > 0 ? (
+                        [...capabilityPortfolios].reverse().map(port => (
+                          <div key={port.portfolioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5 font-sans text-[7px]">
+                            <div className="flex justify-between font-bold text-cyan-300">
+                              <span>Cost: ${port.adaptationCost}</span>
+                              <span>Waiver: {port.governanceWaiverApproved ? "Yes" : "No"}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-500 mt-1">
+                              Last Reviewed: {port.lastReviewedDate.substring(0, 10)}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No capability prioritizations.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Simulation */}
+              <div className="border-l-2 border-emerald-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block mb-2">III. Future States & Regulatory Volatility</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Fitness Assessments */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">6. Adaptability & Learning Rates</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {evolutionAssessments.length > 0 ? (
+                        [...evolutionAssessments].reverse().map(ea => (
+                          <div key={ea.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center text-[7.5px]">
+                            <div>
+                              <span className="font-bold text-cyan-300 text-[8.5px] block">{ea.evaluationPeriod} Evaluation</span>
+                              <div className="text-[7px] text-slate-500 mt-1">
+                                <div>Disruption Resilience: {ea.disruptionResilienceScore}%</div>
+                                <div>Learning Rate: <strong className="text-emerald-450">{ea.organizationalLearningRate}%</strong></div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">Adaptability: {ea.adaptabilityIndex}%</span>
+                              <span className="text-slate-550 text-[7px] block">Sustainability: {ea.sustainabilityIndex}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No strategy assessments history recorded.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Future State Simulator */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">7. Future States Simulator</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {evolutionScenarios.length > 0 ? (
+                        [...evolutionScenarios].reverse().map(os => (
+                          <div key={os.scenarioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{os.name}</span>
+                              <span className="text-purple-400">Volatility: {os.regulatoryVolatility}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1.5 space-y-0.5 font-sans">
+                              <div>Expected Cost Saving: <strong className="text-emerald-450">${os.expectedCostSaving}</strong></div>
+                              <div>Tech Convergence: {os.simulatedTechConvergenceRate}%</div>
+                              <div>Adaptation Time: {os.organizationalAdaptationTimeMonths} months</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No transition scenarios simulated.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Intelligence */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">IV. Evolution Intelligence & Trace explorer</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Recommendations */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">8. Evolution recommendations Queue</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {evolutionRecommendations.length > 0 ? (
+                        evolutionRecommendations.map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{rec.recommendationType}</span>
+                              <span className="text-purple-400">{rec.recommendationStatus}</span>
+                            </div>
+                            <p className="text-[7.5px] text-slate-450 italic mt-1">"{rec.rationale}"</p>
+                            <div className="border-t border-slate-800 pt-1.5 mt-1.5 text-[7px] text-slate-500 grid grid-cols-2 gap-1.5">
+                              <div>Confidence: <strong className="text-emerald-400">{rec.confidenceScore}%</strong></div>
+                              <div>Adaptability Gain: +{rec.estimatedBenefit.adaptabilityGain}%</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No evolution recommendations proposed.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Evidence Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">9. Evidence Explorer</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {evolutionRecommendations.length > 0 ? (
+                        [...evolutionRecommendations].reverse().map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-[8px] font-bold text-cyan-300">Rec ID: {rec.recommendationId.substring(4, 10)}</span>
+                            <div className="text-[7.5px] text-slate-500 font-sans mt-1 space-y-1">
+                              <div>Strategy ID: <strong className="text-purple-400">{rec.strategyId}</strong></div>
+                              <div className="border-t border-slate-850 pt-1">
+                                <strong>Trace:</strong> {rec.evidenceSources.map(s => `${s.sourceId} (${s.sourceType})`).join(", ")}
                               </div>
                             </div>
                           </div>

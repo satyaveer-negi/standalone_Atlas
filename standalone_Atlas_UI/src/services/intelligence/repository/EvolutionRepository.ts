@@ -1,60 +1,62 @@
-import { EvolutionProposal } from "../evolution/EvolutionProposal";
-import { EvolutionImpactAssessment } from "../evolution/EvolutionImpactAssessment";
-import { EvolutionExperiment } from "../evolution/EvolutionExperiment";
-
-export interface EvolutionMetrics {
-  totalProposalsGenerated: number;
-  proposalsApprovedRatio: number;
-  meanExperimentSuccessScore: number;
-}
+import { EvolutionStrategyModel } from "../evolution/EvolutionStrategyModel";
+import { AdaptiveCapabilityPortfolio } from "../evolution/AdaptiveCapabilityPortfolio";
+import { EvolutionAssessment } from "../evolution/EvolutionAssessment";
+import { EvolutionScenario } from "../evolution/EvolutionScenario";
+import { EvolutionRecommendation } from "../evolution/EvolutionRecommendation";
 
 export class EvolutionRepository {
-  private proposals = new Map<string, EvolutionProposal>();
-  private assessments = new Map<string, EvolutionImpactAssessment>();
-  private experiments = new Map<string, EvolutionExperiment>();
+  private strategies = new Map<string, EvolutionStrategyModel>();
+  private portfolios = new Map<string, AdaptiveCapabilityPortfolio>();
+  private assessments = new Map<string, EvolutionAssessment>();
+  private scenarios = new Map<string, EvolutionScenario>();
+  private recommendations = new Map<string, EvolutionRecommendation>();
 
-  private metrics: EvolutionMetrics = {
-    totalProposalsGenerated: 4,
-    proposalsApprovedRatio: 75.0,
-    meanExperimentSuccessScore: 94.6
-  };
-
-  public saveProposal(prop: EvolutionProposal): void {
-    this.proposals.set(prop.proposalId, prop);
+  public saveStrategy(model: EvolutionStrategyModel): void {
+    this.strategies.set(model.strategyId, model);
   }
 
-  public saveAssessment(ass: EvolutionImpactAssessment): void {
-    this.assessments.set(ass.assessmentId, ass);
+  public savePortfolio(portfolio: AdaptiveCapabilityPortfolio): void {
+    this.portfolios.set(portfolio.portfolioId, portfolio);
   }
 
-  public saveExperiment(exp: EvolutionExperiment): void {
-    this.experiments.set(exp.experimentId, exp);
+  public saveAssessment(ea: EvolutionAssessment): void {
+    this.assessments.set(ea.assessmentId, ea);
   }
 
-  public getProposalsList(): EvolutionProposal[] {
-    return Array.from(this.proposals.values());
+  public saveScenario(es: EvolutionScenario): void {
+    this.scenarios.set(es.scenarioId, es);
   }
 
-  public getAssessmentsList(): EvolutionImpactAssessment[] {
+  public saveRecommendation(rec: EvolutionRecommendation): void {
+    this.recommendations.set(rec.recommendationId, rec);
+  }
+
+  public getStrategiesList(): EvolutionStrategyModel[] {
+    return Array.from(this.strategies.values());
+  }
+
+  public getPortfoliosList(): AdaptiveCapabilityPortfolio[] {
+    return Array.from(this.portfolios.values());
+  }
+
+  public getAssessmentsList(): EvolutionAssessment[] {
     return Array.from(this.assessments.values());
   }
 
-  public getExperimentsList(): EvolutionExperiment[] {
-    return Array.from(this.experiments.values());
+  public getScenariosList(): EvolutionScenario[] {
+    return Array.from(this.scenarios.values());
   }
 
-  public getMetrics(): EvolutionMetrics {
-    return this.metrics;
-  }
-
-  public updateMetrics(newMetrics: Partial<EvolutionMetrics>): void {
-    this.metrics = { ...this.metrics, ...newMetrics };
+  public getRecommendationsList(): EvolutionRecommendation[] {
+    return Array.from(this.recommendations.values());
   }
 
   public clear(): void {
-    this.proposals.clear();
+    this.strategies.clear();
+    this.portfolios.clear();
     this.assessments.clear();
-    this.experiments.clear();
+    this.scenarios.clear();
+    this.recommendations.clear();
   }
 }
 
