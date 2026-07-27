@@ -211,6 +211,12 @@ import type { CapabilityMaturityModel } from "../../services/intelligence/strate
 import type { StrategicInvestmentPlan } from "../../services/intelligence/strategy/StrategicInvestmentPlan";
 import type { TechnologyRoadmap } from "../../services/intelligence/strategy/TechnologyRoadmap";
 import type { InnovationPortfolio } from "../../services/intelligence/strategy/InnovationPortfolio";
+import { activeEconomicsRepository } from "../../services/intelligence/repository/EconomicsRepository";
+import type { EngineeringValueModel } from "../../services/intelligence/economics/EngineeringValueModel";
+import type { BenefitRealizationPlan } from "../../services/intelligence/economics/BenefitRealizationPlan";
+import type { PortfolioValueAssessment } from "../../services/intelligence/economics/PortfolioValueAssessment";
+import type { EconomicScenario } from "../../services/intelligence/economics/EconomicScenario";
+import type { ValueForecast } from "../../services/intelligence/economics/ValueForecast";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -432,6 +438,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [strategicInvestmentPlans, setStrategicInvestmentPlans] = useState<StrategicInvestmentPlan[]>([]);
   const [technologyRoadmaps, setTechnologyRoadmaps] = useState<TechnologyRoadmap[]>([]);
   const [innovationPortfolios, setInnovationPortfolios] = useState<InnovationPortfolio[]>([]);
+  const [valueModels, setValueModels] = useState<EngineeringValueModel[]>([]);
+  const [benefitPlans, setBenefitPlans] = useState<BenefitRealizationPlan[]>([]);
+  const [portfolioValueAssessments, setPortfolioValueAssessments] = useState<PortfolioValueAssessment[]>([]);
+  const [economicScenarios, setEconomicScenarios] = useState<EconomicScenario[]>([]);
+  const [valueForecasts, setValueForecasts] = useState<ValueForecast[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2652,6 +2663,132 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerEconomicsAssessment = () => {
+    const assessmentId = `assess-econ-${Date.now()}`;
+
+    // 1. Portfolio Value Assessment
+    const pa: PortfolioValueAssessment = {
+      assessmentId,
+      portfolioId: "portfolio-mock-01",
+      cumulativeBenefits: 750000,
+      cumulativeCosts: 250000,
+      benefitCostRatio: 3.0,
+      strategicScore: 88,
+      sustainabilityIndex: 92,
+      valueTrend: "Improving",
+      assessmentDate: new Date().toISOString()
+    };
+    activeEconomicsRepository.savePortfolioAssessment(pa);
+
+    // 2. Engineering Value Model
+    const ev: EngineeringValueModel = {
+      valueModelId: `val-model-${Date.now()}`,
+      title: "Governor Loop Optimizations Value Model",
+      scopeId: "prog-mock-01",
+      netPresentValue: 45000,
+      internalRateOfReturn: 14.5,
+      paybackPeriodMonths: 18,
+      sustainabilityCredits: 125,
+      valueCategory: "EfficiencyGain",
+      valueDimensions: {
+        financialValue: 45000,
+        engineeringValue: 92.0,
+        organizationalValue: 85.0,
+        societalValue: 90.0
+      },
+      status: "Active"
+    };
+    activeEconomicsRepository.saveValueModel(ev);
+
+    // Refresh UI States
+    setPortfolioValueAssessments(activeEconomicsRepository.getPortfolioAssessmentsList());
+    setValueModels(activeEconomicsRepository.getValueModelsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Value Assessment] Registered Portfolio Economics Score: BCR: ${pa.benefitCostRatio}x, Strategic: ${pa.strategicScore}%, Trend: ${pa.valueTrend}. Initialized Value Model: NPV=$${ev.netPresentValue}, Payback=${ev.paybackPeriodMonths}mo.`
+    ]);
+  };
+
+  const handleTriggerScenarioSimulation = () => {
+    // 1. Economic Scenario
+    const scenarioId = `scen-${Date.now()}`;
+    const es: EconomicScenario = {
+      scenarioId,
+      name: "High AI Investment Scenario",
+      description: "Increase funding levels in AI analytics loops",
+      fundingLevel: 500000,
+      riskAppetite: "Medium",
+      simulatedNPV: 1250000,
+      simulatedROI: 2.5,
+      confidenceInterval: "90% - 95%",
+      scenarioAssumptions: ["AI accuracy remains stable at 94%"],
+      scenarioStatus: "Simulated"
+    };
+    activeEconomicsRepository.saveEconomicScenario(es);
+
+    // 2. Benefit Realization Plan
+    const planId = `plan-real-${Date.now()}`;
+    const bp: BenefitRealizationPlan = {
+      planId,
+      investmentPlanId: "plan-mock-01",
+      targetMetricName: "governor-efficiency-percentage",
+      baselineValue: 72.0,
+      expectedValue: 85.0,
+      realizedValue: 86.4,
+      realizedDate: "2026-12-31",
+      variance: 1.4,
+      benefitOwner: "Economics Analyst Lead",
+      verificationEvidence: ["governor-efficiency-verification-audit-26"],
+      realizationStatus: "Exceeded"
+    };
+    activeEconomicsRepository.saveBenefitPlan(bp);
+
+    // 3. Value Forecast
+    const forecastId = `fore-${Date.now()}`;
+    const vf: ValueForecast = {
+      forecastId,
+      roadmapId: "roadmap-mock-01",
+      horizonYears: 3,
+      forecastPoints: [
+        {
+          year: 2026,
+          projectedSavings: 15000,
+          projectedRevenue: 5000,
+          projectedCostAvoidance: 10000,
+          confidence: 95.0
+        },
+        {
+          year: 2027,
+          projectedSavings: 30000,
+          projectedRevenue: 10000,
+          projectedCostAvoidance: 20000,
+          confidence: 92.5
+        },
+        {
+          year: 2028,
+          projectedSavings: 60000,
+          projectedRevenue: 25000,
+          projectedCostAvoidance: 35000,
+          confidence: 88.0
+        }
+      ],
+      assumptions: ["Microgrid telemetry sensing is fully deployed by mid 2026"],
+      lastUpdated: new Date().toISOString()
+    };
+    activeEconomicsRepository.saveValueForecast(vf);
+
+    // Refresh UI States
+    setEconomicScenarios(activeEconomicsRepository.getEconomicScenariosList());
+    setBenefitPlans(activeEconomicsRepository.getBenefitPlansList());
+    setValueForecasts(activeEconomicsRepository.getValueForecastsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Scenario Simulation] Simulated Scenario: ${es.name} (Simulated NPV: $${es.simulatedNPV}). Proposed Benefit Plan for (${bp.targetMetricName}) (Status: ${bp.realizationStatus}). Projection points registered for ${vf.horizonYears} years.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3005,6 +3142,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🏛️ Strategic Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringEconomics")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringEconomics"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            💰 Economics Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -8045,6 +8192,181 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-655 italic col-span-3">No innovation projects registered.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringEconomics" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">💰 ENTERPRISE ENGINEERING ECONOMICS & VALUE INTELLIGENCE STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Evaluating realized vs projected ROI savings, payback horizons, alternative economic funding scenarios, and societal value indicators</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerEconomicsAssessment}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Assess Value
+                  </button>
+                  <button
+                    onClick={handleTriggerScenarioSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Scenario
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Value Models */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Engineering Value Models</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {valueModels.length > 0 ? (
+                      [...valueModels].reverse().map(ev => (
+                        <div key={ev.valueModelId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <span className="text-cyan-300 font-bold">{ev.title}</span>
+                          <div className="text-[7.5px] text-slate-400 mt-1 space-y-0.5 font-mono">
+                            <div>Net Present Value: <strong className="text-emerald-400">${ev.netPresentValue}</strong></div>
+                            <div>IRR Target: {ev.internalRateOfReturn}%</div>
+                            <div>Payback Horizon: {ev.paybackPeriodMonths} mo</div>
+                            <div className="border-t border-slate-850/50 pt-1 mt-1 space-y-0.5 text-[7px] text-slate-500">
+                              <div>Fin: {ev.valueDimensions.financialValue} | Eng: {ev.valueDimensions.engineeringValue}%</div>
+                              <div>Org: {ev.valueDimensions.organizationalValue}% | Soc: {ev.valueDimensions.societalValue}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No value models assessed. Click Assess Value.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Benefit Realization plans */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Benefit Realization Tracking</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {benefitPlans.length > 0 ? (
+                      [...benefitPlans].reverse().map(bp => (
+                        <div key={bp.planId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">{bp.targetMetricName}</span>
+                            <span className={`px-1.5 rounded text-[7px] font-bold ${
+                              bp.realizationStatus === "Exceeded" ? "bg-emerald-950 text-emerald-400" : "bg-cyan-950 text-cyan-400"
+                            }`}>{bp.realizationStatus}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[7.5px] text-slate-450 border-b border-slate-850 pb-1 mb-1 font-sans">
+                            <div>Baseline: {bp.baselineValue}</div>
+                            <div>Expected: {bp.expectedValue}</div>
+                            <div className="text-emerald-400 font-bold">Realized: {bp.realizedValue}</div>
+                          </div>
+                          <div className="flex justify-between text-[7px] text-slate-500 font-sans">
+                            <span>Owner: {bp.benefitOwner}</span>
+                            <span>Audit: {bp.verificationEvidence[0]}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No benefit realization plans registered. Click Simulate Scenario.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Portfolio Economics card */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Portfolio Strategic ROI Value Assessment</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {portfolioValueAssessments.length > 0 ? (
+                      [...portfolioValueAssessments].reverse().map(pa => (
+                        <div key={pa.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8.5px] mb-1">
+                            <span className="text-cyan-300">Cost-Benefit Ratio: {pa.benefitCostRatio}x</span>
+                            <span className="text-purple-400 font-bold">{pa.valueTrend}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-300 space-y-0.5">
+                            <div>Cumulative Benefits: <span className="text-emerald-400">${pa.cumulativeBenefits}</span></div>
+                            <div>Cumulative Costs: <span className="text-red-400">${pa.cumulativeCosts}</span></div>
+                            <div className="text-[7px] text-slate-500 border-t border-slate-850/40 pt-1 mt-1 flex justify-between">
+                              <span>Strat Score: {pa.strategicScore}%</span>
+                              <span>Sust Index: {pa.sustainabilityIndex}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No value assessments recorded.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Economic funding scenarios and value forecasting curve points */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Scenario Simulator */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Funding Scenario Simulator Simulations</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {economicScenarios.length > 0 ? (
+                      economicScenarios.map(es => (
+                        <div key={es.scenarioId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-[8.5px]">
+                            <span className="text-cyan-300">{es.name}</span>
+                            <span className="text-purple-400">{es.scenarioStatus}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-400 space-y-0.5 mt-1 font-sans">
+                            <div>Funding Allocated: <strong className="text-emerald-400">${es.fundingLevel}</strong></div>
+                            <div>Simulated NPV: ${es.simulatedNPV} (ROI: {es.simulatedROI}x)</div>
+                            <div>Risk appetite bounds: {es.riskAppetite}</div>
+                            <p className="text-[7px] text-slate-550 border-t border-slate-850/40 pt-1 mt-1">Assumptions: "{es.scenarioAssumptions.join(", ")}"</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic col-span-2">No economic funding scenario runs simulated.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Value Forecast points curves */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Horizon Value Forecast Projections</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {valueForecasts.length > 0 ? (
+                      [...valueForecasts].reverse().map(vf => (
+                        <div key={vf.forecastId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-[8.5px]">
+                            <span className="text-cyan-300">Forecast: {vf.forecastId.substring(5, 11)}</span>
+                            <span className="text-purple-400">{vf.horizonYears} Yr Horizon</span>
+                          </div>
+                          
+                          {/* Forecast Points iterations curves */}
+                          <div className="space-y-1.5 mt-1.5 border-t border-slate-850 pt-1">
+                            {vf.forecastPoints.map(point => (
+                              <div key={point.year} className="bg-slate-950 p-1.5 rounded text-[7.5px] flex flex-col gap-0.5 border border-slate-850/40 font-mono">
+                                <div className="flex justify-between font-bold">
+                                  <span>Year {point.year}</span>
+                                  <span className="text-emerald-450">{point.confidence}% Conf</span>
+                                </div>
+                                <div className="flex justify-between text-[7px] text-slate-450">
+                                  <span>Savings: ${point.projectedSavings}</span>
+                                  <span>Avoidance: ${point.projectedCostAvoidance}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No value forecasts projected.</span>
                     )}
                   </div>
                 </div>
