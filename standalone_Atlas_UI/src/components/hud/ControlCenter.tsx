@@ -229,6 +229,12 @@ import type { TransformationProgram } from "../../services/intelligence/organiza
 import type { OperatingModelAssessment } from "../../services/intelligence/organization/OperatingModelAssessment";
 import type { OrganizationalScenario } from "../../services/intelligence/organization/OrganizationalScenario";
 import type { TransformationRecommendation } from "../../services/intelligence/organization/TransformationRecommendation";
+import { activeEcosystemRepository } from "../../services/intelligence/repository/EcosystemRepository";
+import type { EnterpriseNetworkModel } from "../../services/intelligence/ecosystem/EnterpriseNetworkModel";
+import type { CollaborationProgram } from "../../services/intelligence/ecosystem/CollaborationProgram";
+import type { EcosystemAssessment } from "../../services/intelligence/ecosystem/EcosystemAssessment";
+import type { EcosystemScenario } from "../../services/intelligence/ecosystem/EcosystemScenario";
+import type { CollaborationRecommendation } from "../../services/intelligence/ecosystem/CollaborationRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -465,6 +471,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [operatingModelAssessments, setOperatingModelAssessments] = useState<OperatingModelAssessment[]>([]);
   const [organizationalScenarios, setOrganizationalScenarios] = useState<OrganizationalScenario[]>([]);
   const [transformationRecommendations, setTransformationRecommendations] = useState<TransformationRecommendation[]>([]);
+  const [enterpriseNetworks, setEnterpriseNetworks] = useState<EnterpriseNetworkModel[]>([]);
+  const [collaborationPrograms, setCollaborationPrograms] = useState<CollaborationProgram[]>([]);
+  const [ecosystemAssessments, setEcosystemAssessments] = useState<EcosystemAssessment[]>([]);
+  const [ecosystemScenarios, setEcosystemScenarios] = useState<EcosystemScenario[]>([]);
+  const [collaborationRecommendations, setCollaborationRecommendations] = useState<CollaborationRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -3067,6 +3078,142 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerEcosystemSetup = () => {
+    const networkId = `partner-${Date.now()}`;
+
+    // 1. Enterprise Network Models
+    const partner: EnterpriseNetworkModel = {
+      networkId,
+      partnerName: "Apex Sensory Telemetry Corp",
+      partnerType: "Supplier",
+      trustScore: 92,
+      interoperabilityIndex: 88,
+      sharedAssetsCount: 4,
+      criticality: "High",
+      connectedPartners: [
+        {
+          partnerId: "partner-secondary-01",
+          relationshipType: "JointDevelopment"
+        }
+      ],
+      status: "Active"
+    };
+    activeEcosystemRepository.saveNetwork(partner);
+
+    const partner2: EnterpriseNetworkModel = {
+      networkId: "partner-secondary-01",
+      partnerName: "Grid Frequency Balancing LLC",
+      partnerType: "ResearchCollaborator",
+      trustScore: 85,
+      interoperabilityIndex: 90,
+      sharedAssetsCount: 2,
+      criticality: "Medium",
+      connectedPartners: [],
+      status: "Active"
+    };
+    activeEcosystemRepository.saveNetwork(partner2);
+
+    // 2. Ecosystem Assessment
+    const ea: EcosystemAssessment = {
+      assessmentId: `assess-eco-${Date.now()}`,
+      evaluationPeriod: "Q2-2026",
+      collaborationEffectiveness: 87.5,
+      networkResilienceScore: 84.0,
+      sharedValuePercentage: 78.0,
+      knowledgeExchangeScore: 85.0,
+      complianceAuditStatus: "Compliant",
+      ecosystemValueTrend: "Improving",
+      assessmentDate: new Date().toISOString()
+    };
+    activeEcosystemRepository.saveAssessment(ea);
+
+    // Refresh UI States
+    setEnterpriseNetworks(activeEcosystemRepository.getNetworksList());
+    setEcosystemAssessments(activeEcosystemRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Ecosystem Setup] Onboarded network partners: Apex Sensory and Grid Frequency. Assessed collaboration effectiveness: ${ea.collaborationEffectiveness}%, Knowledge Exchange Score: ${ea.knowledgeExchangeScore}%.`
+    ]);
+  };
+
+  const handleTriggerEcosystemSimulation = () => {
+    // 1. Ecosystem Scenario
+    const scenarioId = `scen-eco-${Date.now()}`;
+    const es: EcosystemScenario = {
+      scenarioId,
+      name: "Supplier Interruption Redundancy",
+      description: "Fallback to secondary providers under major severity outage disruptions",
+      simulatedPartnersCount: 4,
+      projectedThroughputDelta: 18.0,
+      coordinationRiskIndex: 22.0,
+      expectedLatencyReductionDays: 1.5,
+      estimatedCollaborationCost: 65000,
+      disruptionSeverity: "Major",
+      scenarioStatus: "Simulated"
+    };
+    activeEcosystemRepository.saveScenario(es);
+
+    // 2. Collaboration Program
+    const programId = `collab-${Date.now()}`;
+    const cp: CollaborationProgram = {
+      programId,
+      title: "Cross-Enterprise Sensory Balancing Program",
+      objectives: ["Reduce grid latency by 30ms", "Optimize mutual asset utilization"],
+      milestones: [
+        {
+          id: "cm1",
+          description: "Establish Sensory Data Gateway Link",
+          status: "Completed",
+          targetDate: "2026-04-30",
+          dependencies: []
+        }
+      ],
+      sharedResources: [
+        {
+          resourceType: "Sensory Data Storage Buffer GB",
+          allocatedQuantity: 120,
+          capacityLimit: 200
+        }
+      ],
+      governanceModel: {
+        leadOrganization: "Turbine Dynamics Division",
+        participatingOrganizations: ["Apex Sensory Telemetry Corp", "Grid Frequency Balancing LLC"],
+        steeringCommittee: ["Steering Officer Apex", "Steering Lead Balancing"]
+      },
+      status: "Active"
+    };
+    activeEcosystemRepository.saveProgram(cp);
+
+    // 3. Collaboration Recommendation
+    const recommendationId = `rec-eco-${Date.now()}`;
+    const rec: CollaborationRecommendation = {
+      recommendationId,
+      recommendationType: "JointInnovation",
+      partnerId: "partner-mock-01",
+      rationale: "Aligns Apex sensors calibration directly to grid telemetry stream feedback loops",
+      confidenceScore: 90.0,
+      evidenceSources: ["org-assert-evidence-continuity"],
+      estimatedBenefit: {
+        coordinationOverheadReduction: 15.0,
+        throughputGain: 12.5,
+        riskReduction: 20.0
+      },
+      recommendationStatus: "Proposed"
+    };
+    activeEcosystemRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setEcosystemScenarios(activeEcosystemRepository.getScenariosList());
+    setCollaborationPrograms(activeEcosystemRepository.getProgramsList());
+    setCollaborationRecommendations(activeEcosystemRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Ecosystem simulation] Proposed Collaboration recommendation: ${rec.recommendationType} (Target Partner: Apex, Confidence: ${rec.confidenceScore}%). Simulated scenario disruption severity: ${es.disruptionSeverity}, expected cost: $${es.estimatedCollaborationCost}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3450,6 +3597,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             👥 Organizational Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("ecosystemIntelligence")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "ecosystemIntelligence"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🤝 Ecosystem Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -9141,6 +9298,275 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                         ))
                       ) : (
                         <span className="text-slate-650 italic">No evidence linkages.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "ecosystemIntelligence" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🤝 ENTERPRISE ECOSYSTEM INTELLIGENCE & COLLABORATION STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Managing cross-enterprise trust, inter-partner relationship graphs, shared resource allocation limits, and joint innovation initiatives</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerEcosystemSetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Ecosystem Matrix
+                  </button>
+                  <button
+                    onClick={handleTriggerEcosystemSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Collaboration
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Network */}
+              <div className="border-l-2 border-cyan-500/50 pl-2">
+                <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block mb-2">I. Network & Relationships Graph</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Partner Matrix */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">1. Partner Matrix</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450">
+                      {enterpriseNetworks.length > 0 ? (
+                        [...enterpriseNetworks].reverse().map(partner => (
+                          <div key={partner.networkId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-cyan-300 font-bold">{partner.partnerName}</span>
+                            <div className="flex justify-between text-[7px] text-slate-450 mt-1">
+                              <span>Type: {partner.partnerType}</span>
+                              <span className={`font-bold ${
+                                partner.status === "Active" ? "text-emerald-450" : "text-purple-400"
+                              }`}>{partner.status}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No partners onboarded. Click Deploy Ecosystem Matrix.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Trust Dashboard */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">2. Trust & Interoperability Index</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {enterpriseNetworks.length > 0 ? (
+                        [...enterpriseNetworks].reverse().map(partner => (
+                          <div key={partner.networkId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8px] text-cyan-300">
+                              <span>Trust: {partner.trustScore}%</span>
+                              <span>Interop: {partner.interoperabilityIndex}%</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1 space-y-0.5">
+                              <div>Shared Assets Count: <strong className="text-emerald-450">{partner.sharedAssetsCount}</strong></div>
+                              <div>Criticality Level: {partner.criticality}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No trust indicators evaluated.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Relationship Graph Linkages */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">3. Relationship Graph Edges</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450 font-sans">
+                      {enterpriseNetworks.length > 0 ? (
+                        [...enterpriseNetworks].reverse().map(partner => (
+                          <div key={partner.networkId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7px]">
+                            {partner.connectedPartners.length > 0 ? (
+                              partner.connectedPartners.map((rel, idx) => (
+                                <div key={idx} className="bg-slate-950/40 p-1 rounded flex justify-between">
+                                  <span>➔ {rel.partnerId.substring(8, 14)}</span>
+                                  <span className="text-purple-400 font-bold">{rel.relationshipType}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-slate-655 italic">No outgoing relationship edges.</span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No relationship links modeled.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Collaboration */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">II. Joint Collaboration & Resources</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Collaboration Roadmaps */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">4. Programs & Joint Roadmaps</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal">
+                      {collaborationPrograms.length > 0 ? (
+                        collaborationPrograms.map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <span className="font-bold text-cyan-300 text-[8.5px]">{prog.title}</span>
+                            <div className="space-y-1.5 mt-1 border-t border-slate-850 pt-1 text-[7px] text-slate-400 font-sans">
+                              {prog.milestones.map(m => (
+                                <div key={m.id} className="flex justify-between items-center bg-slate-950 p-1 rounded">
+                                  <span>{m.description} ({m.targetDate})</span>
+                                  <span className="text-emerald-450 font-bold">{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No active programs. Click Simulate Collaboration.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Shared Resource Pools */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">5. Shared Resources & Governance</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {collaborationPrograms.length > 0 ? (
+                        [...collaborationPrograms].reverse().map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5 font-sans text-[7px]">
+                            <div>
+                              <span className="text-slate-500 block">Lead: {prog.governanceModel.leadOrganization}</span>
+                              <span className="text-slate-500">Steering: {prog.governanceModel.steeringCommittee.join(", ")}</span>
+                            </div>
+                            <div className="space-y-1 mt-1 border-t border-slate-850 pt-1">
+                              {prog.sharedResources.map((res, idx) => (
+                                <div key={idx} className="bg-slate-950 p-1 rounded flex justify-between">
+                                  <span>{res.resourceType}</span>
+                                  <strong className="text-emerald-450">{res.allocatedQuantity}/{res.capacityLimit}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No resources allocated.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Simulation */}
+              <div className="border-l-2 border-emerald-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block mb-2">III. Scenario & Supply Chain Simulations</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Ecosystem Assessments */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">6. Ecosystem Assessments & Compliance</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {ecosystemAssessments.length > 0 ? (
+                        [...ecosystemAssessments].reverse().map(ea => (
+                          <div key={ea.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center text-[7.5px]">
+                            <div>
+                              <span className="font-bold text-cyan-300 text-[8.5px] block">{ea.evaluationPeriod} Evaluation</span>
+                              <div className="text-[7px] text-slate-500 mt-1">
+                                <div>Inter-Resilience Score: {ea.networkResilienceScore}%</div>
+                                <div>Compliance Audit: <strong className="text-emerald-400">{ea.complianceAuditStatus}</strong></div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">Knowledge Exchange: {ea.knowledgeExchangeScore}%</span>
+                              <span className="text-slate-550 text-[7px] block">Collaboration Index: {ea.collaborationEffectiveness}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No assessment history recorded.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Simulator */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">7. Disruption Simulator</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {ecosystemScenarios.length > 0 ? (
+                        [...ecosystemScenarios].reverse().map(os => (
+                          <div key={os.scenarioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{os.name}</span>
+                              <span className="text-red-400">Outage: {os.disruptionSeverity}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1.5 space-y-0.5 font-sans">
+                              <div>Simulation Cost: <strong className="text-emerald-450">${os.estimatedCollaborationCost}</strong></div>
+                              <div>Throughput Delta: +{os.projectedThroughputDelta}%</div>
+                              <div>Coordination Risk: {os.coordinationRiskIndex}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No supply chain simulations run.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Intelligence */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">IV. Collaboration Intelligence & Ecosystem Traceability</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Recommendations */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">8. Collaboration recommendations Queue</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {collaborationRecommendations.length > 0 ? (
+                        collaborationRecommendations.map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{rec.recommendationType}</span>
+                              <span className="text-purple-400">{rec.recommendationStatus}</span>
+                            </div>
+                            <p className="text-[7.5px] text-slate-450 italic mt-1">"{rec.rationale}"</p>
+                            <div className="border-t border-slate-800 pt-1.5 mt-1.5 text-[7px] text-slate-500 grid grid-cols-2 gap-1.5">
+                              <div>Confidence: <strong className="text-emerald-400">{rec.confidenceScore}%</strong></div>
+                              <div>Risk Reduction: {rec.estimatedBenefit.riskReduction}%</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No ecosystem recommendations proposed.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Evidence Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">9. Evidence Traceability</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {collaborationRecommendations.length > 0 ? (
+                        [...collaborationRecommendations].reverse().map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-[8px] font-bold text-cyan-300">Rec ID: {rec.recommendationId.substring(4, 10)}</span>
+                            <div className="text-[7.5px] text-slate-500 font-sans mt-1 space-y-1">
+                              <div>Lead Partner: <strong className="text-purple-400">{rec.partnerId}</strong></div>
+                              <div className="border-t border-slate-850 pt-1">
+                                <strong>Trace:</strong> {rec.evidenceSources.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No trace lineage logs.</span>
                       )}
                     </div>
                   </div>

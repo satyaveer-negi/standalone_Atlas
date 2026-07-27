@@ -33,6 +33,7 @@ import { activeStrategicVerificationContributor } from "../../../../intelligence
 import { activeEconomicsVerificationContributor } from "../../../../intelligence/verification/EconomicsVerificationContributor";
 import { activeAdaptiveGovernanceVerificationContributor } from "../../../../intelligence/verification/AdaptiveGovernanceVerificationContributor";
 import { activeOrganizationVerificationContributor } from "../../../../intelligence/verification/OrganizationVerificationContributor";
+import { activeEcosystemVerificationContributor } from "../../../../intelligence/verification/EcosystemVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -157,6 +158,10 @@ export class VerificationEngine {
     // Evaluate Organizational Intelligence checks
     const organizationAsserts = activeOrganizationVerificationContributor.verifyOrganizationEcosystem();
     organizationAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Ecosystem Intelligence checks
+    const ecosystemAsserts = activeEcosystemVerificationContributor.verifyEcosystem();
+    ecosystemAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();
