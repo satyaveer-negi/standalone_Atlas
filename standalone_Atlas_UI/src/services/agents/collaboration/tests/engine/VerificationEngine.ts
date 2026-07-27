@@ -25,6 +25,7 @@ import { activeConstitutionVerificationContributor } from "../../../../intellige
 import { activeTrustVerificationContributor } from "../../../../intelligence/verification/TrustVerificationContributor";
 import { activeAssuranceVerificationContributor } from "../../../../intelligence/verification/AssuranceVerificationContributor";
 import { activeRiskVerificationContributor } from "../../../../intelligence/verification/RiskVerificationContributor";
+import { activeResilienceVerificationContributor } from "../../../../intelligence/verification/ResilienceVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -117,6 +118,10 @@ export class VerificationEngine {
     // Evaluate Engineering Risk checks
     const riskAsserts = activeRiskVerificationContributor.verifyRiskEcosystem();
     riskAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Engineering Resilience checks
+    const resilienceAsserts = activeResilienceVerificationContributor.verifyResilienceEcosystem();
+    resilienceAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

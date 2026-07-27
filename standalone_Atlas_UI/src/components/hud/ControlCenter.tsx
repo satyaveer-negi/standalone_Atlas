@@ -177,6 +177,15 @@ import type { SafetyCase } from "../../services/intelligence/risk/SafetyCase";
 import type { RiskAssessment } from "../../services/intelligence/risk/RiskAssessment";
 import type { ResidualRiskAssessment } from "../../services/intelligence/risk/ResidualRiskAssessment";
 import type { IncidentRecord } from "../../services/intelligence/risk/IncidentRecord";
+import { activeResilienceRepository } from "../../services/intelligence/repository/ResilienceRepository";
+import type { ResiliencePlan } from "../../services/intelligence/resilience/ResiliencePlan";
+import type { FailureScenario } from "../../services/intelligence/resilience/FailureScenario";
+import type { RecoveryStrategy } from "../../services/intelligence/resilience/RecoveryStrategy";
+import type { ContinuityPlan } from "../../services/intelligence/resilience/ContinuityPlan";
+import type { ResilienceAssessment } from "../../services/intelligence/resilience/ResilienceAssessment";
+import type { FailureEvent } from "../../services/intelligence/resilience/FailureEvent";
+import type { RecoveryExecution } from "../../services/intelligence/resilience/RecoveryExecution";
+import type { DependencyModel } from "../../services/intelligence/resilience/DependencyModel";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -218,6 +227,7 @@ type ActiveWorkspace =
   | "knowledgeTrust"
   | "engineeringAssurance"
   | "engineeringRisk"
+  | "engineeringResilience"
   | "agents";
 
 export function ControlCenter({ onClose }: ControlCenterProps) {
@@ -369,6 +379,13 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
   const [residualRiskAssessments, setResidualRiskAssessments] = useState<ResidualRiskAssessment[]>([]);
   const [incidentRecords, setIncidentRecords] = useState<IncidentRecord[]>([]);
+  const [resiliencePlans, setResiliencePlans] = useState<ResiliencePlan[]>([]);
+  const [failureScenarios, setFailureScenarios] = useState<FailureScenario[]>([]);
+  const [recoveryExecutions, setRecoveryExecutions] = useState<RecoveryExecution[]>([]);
+  const [continuityPlans, setContinuityPlans] = useState<ContinuityPlan[]>([]);
+  const [resilienceAssessments, setResilienceAssessments] = useState<ResilienceAssessment[]>([]);
+  const [failureEvents, setFailureEvents] = useState<FailureEvent[]>([]);
+  const [dependencyModels, setDependencyModels] = useState<DependencyModel[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -1848,6 +1865,149 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerFailureSimulation = () => {
+    // 1. Register ResiliencePlan
+    const planId = `res-plan-${Date.now()}`;
+    const rp: ResiliencePlan = {
+      planId,
+      targetAssetId: "mock-art-trust-01",
+      rtoMs: 500,
+      rpoMs: 1000,
+      degradationLevels: 15,
+      redundancyStrategy: "Active Sensor Replication",
+      status: "Active",
+      criticality: "MissionCritical",
+      availabilityTarget: 99.99,
+      owner: "Resilience Engineering Board",
+      lastValidated: new Date().toISOString(),
+      nextValidation: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    };
+    activeResilienceRepository.savePlan(rp);
+
+    // 2. Register RecoveryStrategy
+    const strategyId = `strat-${Date.now()}`;
+    const rs: RecoveryStrategy = {
+      strategyId,
+      detectionSteps: ["Heartbeat monitor checksum checks"],
+      isolationSteps: ["Bypass primary sensor feed line"],
+      containmentSteps: ["Engage backup regulator limiter limits"],
+      recoverySteps: ["Hot-swap actuator lines"],
+      validationSteps: ["Verify recovery stability indices"],
+      returnToNormalSteps: ["Reset alert threshold levels"]
+    };
+    activeResilienceRepository.saveStrategy(rs);
+
+    // 3. Register FailureScenario
+    const scenarioId = `scen-${Date.now()}`;
+    const fs: FailureScenario = {
+      scenarioId,
+      trigger: "Primary pitch sensor telemetry dropout",
+      failureType: "Communication",
+      detectionMethod: "Heartbeat checksum mismatch",
+      expectedImpact: "Actuator lockup warnings",
+      recoveryStrategyId: strategyId,
+      simulationStatus: "Completed",
+      validationResult: "Pass",
+      affectedAssets: ["mock-art-trust-01"],
+      estimatedRecoveryTimeMs: 450,
+      linkedResiliencePlanId: planId
+    };
+    activeResilienceRepository.saveScenario(fs);
+
+    // 4. Register FailureEvent & RecoveryExecution
+    const eventId = `evt-${Date.now()}`;
+    const fe: FailureEvent = {
+      eventId,
+      linkedFailureScenarioId: scenarioId,
+      detectionTimestamp: new Date().toISOString(),
+      impactedAssets: ["mock-art-trust-01"],
+      severity: 4,
+      recoveryOutcome: "Success"
+    };
+    activeResilienceRepository.saveEvent(fe);
+
+    const executionId = `exec-${Date.now()}`;
+    const re: RecoveryExecution = {
+      executionId,
+      strategyReferenceId: strategyId,
+      startTime: new Date().toISOString(),
+      completionTime: new Date(Date.now() + 450).toISOString(),
+      successStatus: "Success",
+      operatorId: "Automated Safety Gate",
+      validationResults: ["Stabilization confirmed in 450ms"]
+    };
+    activeResilienceRepository.saveExecution(re);
+
+    // 5. Register DependencyModel
+    const modelId = `dep-${Date.now()}`;
+    const dm: DependencyModel = {
+      modelId,
+      upstreamDependencies: ["Sensor Feed Controller Service", "Grid Supply Line"],
+      downstreamDependencies: ["Bypass Load Regulator Unit", "Hydraulic Pitch Actuator"],
+      redundancyRelationships: ["Sensor line A &harr; Sensor line B (Hot-standby)"],
+      singlePointsOfFailure: ["Primary Microcontroller Board"]
+    };
+    activeResilienceRepository.saveDependencyModel(dm);
+
+    // 6. Calculate ResilienceAssessment
+    const ra: ResilienceAssessment = {
+      assessmentId: `ra-res-${Date.now()}`,
+      achievedAvailability: 99.99,
+      recoverySuccessRate: 100,
+      resilienceMaturity: 5,
+      continuityCompliance: 100,
+      degradationEfficiency: 95,
+      assessmentDate: new Date().toISOString()
+    };
+    activeResilienceRepository.saveAssessment(ra);
+
+    // Refresh UI States
+    setResiliencePlans(activeResilienceRepository.getPlansList());
+    setFailureScenarios(activeResilienceRepository.getScenariosList());
+    setRecoveryExecutions(activeResilienceRepository.getExecutionsList());
+    setResilienceAssessments(activeResilienceRepository.getAssessmentsList());
+    setFailureEvents(activeResilienceRepository.getEventsList());
+    setDependencyModels(activeResilienceRepository.getDependenciesList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Resilience Simulation] Simulated failure scenario ${fs.scenarioId}. Recovery execution ${re.executionId} completed in 450ms. Status: ${re.successStatus}.`
+    ]);
+  };
+
+  const handleTriggerGracefulDegradation = () => {
+    // Register degraded continuity plan
+    const continuityPlanId = `cp-deg-${Date.now()}`;
+    const cp: ContinuityPlan = {
+      continuityPlanId,
+      criticalServices: ["Emergency Pitch Governor Service", "Load Shedding Controller"],
+      dependencyPriorities: ["Actuator feedback loops", "Thermal safety monitors"],
+      minimumServiceLevels: 75, // Degraded acceptable level
+      escalationPaths: ["Notify Lead Safety Engineer", "Trigger automated controlled shutdown"]
+    };
+    activeResilienceRepository.saveContinuityPlan(cp);
+
+    // Add assessment showing degraded operation
+    const ra: ResilienceAssessment = {
+      assessmentId: `ra-res-deg-${Date.now()}`,
+      achievedAvailability: 99.5,
+      recoverySuccessRate: 98,
+      resilienceMaturity: 4,
+      continuityCompliance: 100,
+      degradationEfficiency: 88, // Reduced efficiency under degraded fallback mode
+      assessmentDate: new Date().toISOString()
+    };
+    activeResilienceRepository.saveAssessment(ra);
+
+    setContinuityPlans(activeResilienceRepository.getContinuityPlansList());
+    setResilienceAssessments(activeResilienceRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Graceful Degradation] Engaged fallback ContinuityPlan ${cp.continuityPlanId}. Minimum service level target is ${cp.minimumServiceLevels}%. System operates in degraded safe state.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -2161,6 +2321,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             ⚠️ Risk & Safety Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("engineeringResilience")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "engineeringResilience"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🔋 Resilience Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -6086,6 +6256,172 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-655 italic">No incident feedback recorded. Run Incident Simulation to trigger safety interlocks feedback loop.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "engineeringResilience" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🔋 ENGINEERING RESILIENCE & OPERATIONAL CONTINUITY STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Staged incident recovery strategy logs, active service continuity fallback paths, and critical upstream/downstream dependency tracking</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerFailureSimulation}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Failure
+                  </button>
+                  <button
+                    onClick={handleTriggerGracefulDegradation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Engage Fallback
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Resilience Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Resilience Assessment Metrics</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {resilienceAssessments.length > 0 ? (
+                      [...resilienceAssessments].reverse().map((ra, idx) => (
+                        <div key={ra.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">Eval: {ra.assessmentId.substring(7, 15)}...</span>
+                            <span className="text-purple-400">Maturity: {ra.resilienceMaturity}/5</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Availability:</span>
+                            <strong className="text-emerald-400">{ra.achievedAvailability}%</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Recovery Rate:</span>
+                            <strong className="text-cyan-300">{ra.recoverySuccessRate}%</strong>
+                          </div>
+                          <div className="flex justify-between text-[7px] text-slate-500">
+                            <span>Compliance: {ra.continuityCompliance}%</span>
+                            <span>Degradation Eff: {ra.degradationEfficiency}%</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No assessments compiled. Trigger simulation.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Failure Scenarios */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Failures Catalogue (Failure Scenarios)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {failureScenarios.length > 0 ? (
+                      [...failureScenarios].reverse().map(scen => (
+                        <div key={scen.scenarioId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Scenario: {scen.scenarioId}</span>
+                            <span className="text-purple-400">Type: {scen.failureType}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-300">Trigger: "{scen.trigger}" &rarr; Impact: "{scen.expectedImpact}"</p>
+                          <p className="text-[7.5px] text-slate-500 mt-1">Detection Method: {scen.detectionMethod}</p>
+                          <div className="flex justify-between text-[7px] text-slate-600 mt-1 border-t border-slate-850 pt-1">
+                            <span>Est Recovery: {scen.estimatedRecoveryTimeMs}ms</span>
+                            <span>Status: {scen.simulationStatus}</span>
+                            <span className={`px-1.5 rounded ${scen.validationResult === "Pass" ? "bg-emerald-950 text-emerald-450" : "bg-red-950 text-red-400"}`}>
+                              Validation: {scen.validationResult}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No failure scenarios simulated.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Active Continuity Plans */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Safe Degraded Operating Mode (Continuity)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {continuityPlans.length > 0 ? (
+                      [...continuityPlans].reverse().map(cp => (
+                        <div key={cp.continuityPlanId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block text-[8px]">Plan: {cp.continuityPlanId}</span>
+                          <p className="text-[7.5px] text-slate-300 mt-1">Min Service Level: <strong className="text-purple-400">{cp.minimumServiceLevels}%</strong></p>
+                          <div className="text-[7px] text-slate-500 mt-1">
+                            <div>Critical Services: {cp.criticalServices.join(", ")}</div>
+                            <div>Priorities: {cp.dependencyPriorities.join(", ")}</div>
+                            <div className="text-purple-400 font-bold mt-1">Escalation: {cp.escalationPaths[0]}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No degraded continuity states active. Run Graceful Degradation fallback.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Recovery execution runs and dependencies mapper */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Recovery Executions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Automated Recovery Strategies Executions Ledger</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {recoveryExecutions.length > 0 ? (
+                      [...recoveryExecutions].reverse().map(exec => (
+                        <div key={exec.executionId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Execution: {exec.executionId}</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              <div>Strategy Ref: {exec.strategyReferenceId}</div>
+                              <div>Operator: {exec.operatorId}</div>
+                              <div className="text-purple-400 font-bold mt-1">Validation Assertions: "{exec.validationResults.join(", ")}"</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              exec.successStatus === "Success" ? "bg-emerald-950 text-emerald-450" : "bg-red-955 text-red-400"
+                            }`}>{exec.successStatus}</span>
+                            <span className="text-slate-550 text-[7px] block">Start: {exec.startTime.substring(11, 19)}</span>
+                            <span className="text-slate-550 text-[7px] block">End: {exec.completionTime.substring(11, 19)}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No recovery runs registered.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dependency Mapping */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Assets Upstream/Downstream Dependency Models</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {dependencyModels.length > 0 ? (
+                      [...dependencyModels].reverse().map(dm => (
+                        <div key={dm.modelId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block mb-1">Model ID: {dm.modelId}</span>
+                          <div className="text-[7.5px] text-slate-400 space-y-1">
+                            <div>Upstream: <span className="text-slate-200">{dm.upstreamDependencies.join(", ")}</span></div>
+                            <div>Downstream: <span className="text-slate-200">{dm.downstreamDependencies.join(", ")}</span></div>
+                            <div className="text-emerald-400 font-bold">Redundancy: {dm.redundancyRelationships.join(", ")}</div>
+                            <div className="text-red-400 font-bold">Single Points of Failure: {dm.singlePointsOfFailure.join(", ")}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No dependency models mapped. Run simulation.</span>
                     )}
                   </div>
                 </div>
