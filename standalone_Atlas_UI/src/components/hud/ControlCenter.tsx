@@ -235,6 +235,12 @@ import type { CollaborationProgram } from "../../services/intelligence/ecosystem
 import type { EcosystemAssessment } from "../../services/intelligence/ecosystem/EcosystemAssessment";
 import type { EcosystemScenario } from "../../services/intelligence/ecosystem/EcosystemScenario";
 import type { CollaborationRecommendation } from "../../services/intelligence/ecosystem/CollaborationRecommendation";
+import { activeInnovationRepository } from "../../services/intelligence/repository/InnovationRepository";
+import type { KnowledgeNetworkModel } from "../../services/intelligence/innovation/KnowledgeNetworkModel";
+import type { InnovationProgram } from "../../services/intelligence/innovation/InnovationProgram";
+import type { KnowledgeExchangeAssessment } from "../../services/intelligence/innovation/KnowledgeExchangeAssessment";
+import type { InnovationScenario } from "../../services/intelligence/innovation/InnovationScenario";
+import type { InnovationRecommendation } from "../../services/intelligence/innovation/InnovationRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -476,6 +482,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [ecosystemAssessments, setEcosystemAssessments] = useState<EcosystemAssessment[]>([]);
   const [ecosystemScenarios, setEcosystemScenarios] = useState<EcosystemScenario[]>([]);
   const [collaborationRecommendations, setCollaborationRecommendations] = useState<CollaborationRecommendation[]>([]);
+  const [knowledgeDomains, setKnowledgeDomains] = useState<KnowledgeNetworkModel[]>([]);
+  const [innovationPrograms, setInnovationPrograms] = useState<InnovationProgram[]>([]);
+  const [knowledgeExchangeAssessments, setKnowledgeExchangeAssessments] = useState<KnowledgeExchangeAssessment[]>([]);
+  const [innovationScenarios, setInnovationScenarios] = useState<InnovationScenario[]>([]);
+  const [innovationRecommendations, setInnovationRecommendations] = useState<InnovationRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -3214,6 +3225,140 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerInnovationSetup = () => {
+    const domainId = `domain-${Date.now()}`;
+
+    // 1. Knowledge Network Models
+    const domain: KnowledgeNetworkModel = {
+      domainId,
+      domainName: "Distributed Microgrid Synchronization Techniques",
+      intellectualPropertyType: "OpenSource",
+      expertiseTags: ["Sensory telemetry calibration", "Microgrid load frequency clamping"],
+      maturityLevel: 4,
+      knowledgeAssetsCount: 15,
+      licenseType: "Apache-2.0",
+      knowledgeRelationships: [
+        {
+          targetDomainId: "domain-secondary-01",
+          relationshipType: "Supersedes"
+        }
+      ],
+      status: "Validated"
+    };
+    activeInnovationRepository.saveDomain(domain);
+
+    const secondaryDomain: KnowledgeNetworkModel = {
+      domainId: "domain-secondary-01",
+      domainName: "Legacy Dynamic Governor Telemetry Loop",
+      intellectualPropertyType: "Proprietary",
+      expertiseTags: ["Analogue governor control models"],
+      maturityLevel: 2,
+      knowledgeAssetsCount: 5,
+      licenseType: "Proprietary",
+      knowledgeRelationships: [],
+      status: "Validated"
+    };
+    activeInnovationRepository.saveDomain(secondaryDomain);
+
+    // 2. Knowledge Exchange Assessment
+    const ka: KnowledgeExchangeAssessment = {
+      assessmentId: `assess-inno-${Date.now()}`,
+      evaluationPeriod: "Q3-2026",
+      knowledgeReuseRate: 42.5,
+      transferEffectivenessScore: 88.0,
+      collaborationEfficiency: 90.0,
+      innovationVelocityIndex: 82.0,
+      diffusionRate: 35.0,
+      learningTrend: "Improving",
+      assessmentDate: new Date().toISOString()
+    };
+    activeInnovationRepository.saveAssessment(ka);
+
+    // Refresh UI States
+    setKnowledgeDomains(activeInnovationRepository.getDomainsList());
+    setKnowledgeExchangeAssessments(activeInnovationRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Innovation Setup] Registered knowledge domains: Synchronization Techniques. Assessed knowledge reuse rate: ${ka.knowledgeReuseRate}%, Collaboration Efficiency: ${ka.collaborationEfficiency}%.`
+    ]);
+  };
+
+  const handleTriggerInnovationSimulation = () => {
+    // 1. Innovation Scenario
+    const scenarioId = `scen-inno-${Date.now()}`;
+    const es: InnovationScenario = {
+      scenarioId,
+      name: "Autonomous Synchronization Adoption Simulator",
+      description: "Model cross-ecosystem synchronization adoption velocity across 4 platforms",
+      simulatedAdoptionRate: 75.0,
+      projectedMaturityGainMonths: 8,
+      coordinationRiskIndex: 14.5,
+      estimatedInvestmentCost: 95000,
+      technicalUncertainty: "Medium",
+      scenarioStatus: "Simulated"
+    };
+    activeInnovationRepository.saveScenario(es);
+
+    // 2. Innovation Program
+    const programId = `inno-prog-${Date.now()}`;
+    const ip: InnovationProgram = {
+      programId,
+      title: "Active Governor Loop Digital Twin Prototyping",
+      technologyReadinessLevel: 6,
+      innovationLifecycle: "Prototype",
+      objectives: ["Synthesize telemetry loop dynamic models", "Publish open API schema"],
+      milestones: [
+        {
+          id: "im1",
+          description: "Develop High-Fidelity Simulation Twin",
+          status: "Completed",
+          targetDate: "2026-05-15",
+          dependencies: []
+        }
+      ],
+      innovationGateways: [
+        {
+          gateName: "Gateway 2: Prototype Code Audit Checkpoint",
+          requiredArtifacts: ["prototype-code-repository", "twin-simulation-results"],
+          approvalAuthority: "Technical Steering Group",
+          artifactsPresent: ["prototype-code-repository", "twin-simulation-results"]
+        }
+      ],
+      budget: 85000,
+      status: "Active"
+    };
+    activeInnovationRepository.saveProgram(ip);
+
+    // 3. Innovation Recommendation
+    const recommendationId = `rec-inno-${Date.now()}`;
+    const rec: InnovationRecommendation = {
+      recommendationId,
+      recommendationType: "JointR&D",
+      domainId: "domain-mock-01",
+      rationale: "Accelerates dynamic synchronization twin deployment via shared ecosystem resources",
+      confidenceScore: 92.0,
+      evidenceSources: ["eco-assert-evidence-continuity"],
+      estimatedBenefit: {
+        maturityGainTRL: 2,
+        reuseSavings: 45000,
+        coordinationOverheadReduction: 25.0
+      },
+      recommendationStatus: "Proposed"
+    };
+    activeInnovationRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setInnovationScenarios(activeInnovationRepository.getScenariosList());
+    setInnovationPrograms(activeInnovationRepository.getProgramsList());
+    setInnovationRecommendations(activeInnovationRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Innovation simulation] Proposed Innovation recommendation: ${rec.recommendationType} (Maturity Gain: TRL +${rec.estimatedBenefit.maturityGainTRL}, Confidence: ${rec.confidenceScore}%). Simulated scenario technical uncertainty: ${es.technicalUncertainty}, estimated cost: $${es.estimatedInvestmentCost}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3607,6 +3752,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🤝 Ecosystem Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("innovationNetwork")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "innovationNetwork"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            💡 Innovation Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -9559,6 +9714,282 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                             <span className="text-[8px] font-bold text-cyan-300">Rec ID: {rec.recommendationId.substring(4, 10)}</span>
                             <div className="text-[7.5px] text-slate-500 font-sans mt-1 space-y-1">
                               <div>Lead Partner: <strong className="text-purple-400">{rec.partnerId}</strong></div>
+                              <div className="border-t border-slate-850 pt-1">
+                                <strong>Trace:</strong> {rec.evidenceSources.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No trace lineage logs.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "innovationNetwork" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">💡 ENTERPRISE KNOWLEDGE & INNOVATION NETWORK STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Managing cross-enterprise engineering domains, technology readiness level milestones, Stage-Gate lifecycles, and IP licenses</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerInnovationSetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Knowledge Matrix
+                  </button>
+                  <button
+                    onClick={handleTriggerInnovationSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Innovation
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Knowledge */}
+              <div className="border-l-2 border-cyan-500/50 pl-2">
+                <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block mb-2">I. Knowledge Domains & Graph</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Knowledge Domains Matrix */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">1. Domain Matrix</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450">
+                      {knowledgeDomains.length > 0 ? (
+                        [...knowledgeDomains].reverse().map(domain => (
+                          <div key={domain.domainId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-cyan-300 font-bold">{domain.domainName}</span>
+                            <div className="flex justify-between text-[7px] text-slate-450 mt-1">
+                              <span>Maturity: Level {domain.maturityLevel}</span>
+                              <span className={`font-bold ${
+                                domain.status === "Validated" ? "text-emerald-450" : "text-purple-400"
+                              }`}>{domain.status}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No domains registered. Click Deploy Knowledge Matrix.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* IP Portfolio & License */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">2. IP Portfolio & License Model</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {knowledgeDomains.length > 0 ? (
+                        [...knowledgeDomains].reverse().map(domain => (
+                          <div key={domain.domainId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8px] text-cyan-300">
+                              <span>IP Type: {domain.intellectualPropertyType}</span>
+                              <span>License: {domain.licenseType}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1 space-y-0.5">
+                              <div>Assets: <strong className="text-emerald-450">{domain.knowledgeAssetsCount}</strong></div>
+                              <div className="border-t border-slate-850 pt-1 text-[7px] text-slate-500">
+                                <strong>Tags:</strong> {domain.expertiseTags.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No IP information.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Knowledge Relationship Graph Linkages */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">3. Domain Graph Linkages</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450 font-sans">
+                      {knowledgeDomains.length > 0 ? (
+                        [...knowledgeDomains].reverse().map(domain => (
+                          <div key={domain.domainId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1 text-[7px]">
+                            {domain.knowledgeRelationships.length > 0 ? (
+                              domain.knowledgeRelationships.map((rel, idx) => (
+                                <div key={idx} className="bg-slate-950/40 p-1 rounded flex justify-between">
+                                  <span>➔ {rel.targetDomainId.substring(7, 13)}</span>
+                                  <span className="text-purple-400 font-bold">{rel.relationshipType}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-slate-655 italic">No active relationships.</span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No domain graph edges.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Innovation */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">II. TRL Roadmaps & Lifecycle Gates</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* R&D Roadmaps */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">4. Programs & TRL Roadmaps</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal">
+                      {innovationPrograms.length > 0 ? (
+                        innovationPrograms.map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="font-bold text-cyan-300 text-[8.5px]">{prog.title}</span>
+                            <div className="space-y-1.5 mt-1 border-t border-slate-850 pt-1 text-[7px] text-slate-400 font-sans">
+                              <div className="flex justify-between items-center text-[7.5px] bg-slate-950 p-1 rounded">
+                                <span>TRL: {prog.technologyReadinessLevel}</span>
+                                <span>Lifecycle: {prog.innovationLifecycle}</span>
+                              </div>
+                              {prog.milestones.map(m => (
+                                <div key={m.id} className="flex justify-between items-center bg-slate-950 p-1 rounded">
+                                  <span>{m.description}</span>
+                                  <span className="text-emerald-450 font-bold">{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No active innovation programs. Click Simulate Innovation.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Innovation Gateways */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">5. Gateways & Budgets</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {innovationPrograms.length > 0 ? (
+                        [...innovationPrograms].reverse().map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5 font-sans text-[7px]">
+                            <div className="flex justify-between font-bold text-cyan-300">
+                              <span>Budget: ${prog.budget}</span>
+                              <span>Status: {prog.status}</span>
+                            </div>
+                            <div className="space-y-1.5 border-t border-slate-850 pt-1">
+                              {prog.innovationGateways.map((gate, idx) => (
+                                <div key={idx} className="bg-slate-950 p-1 rounded flex flex-col gap-0.5">
+                                  <span className="font-bold text-purple-400">{gate.gateName}</span>
+                                  <span className="text-slate-500">Required: {gate.requiredArtifacts.join(", ")}</span>
+                                  <span className="text-slate-400 font-semibold">Audited: {gate.artifactsPresent.join(", ")}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No gateway structures mapped.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Simulation */}
+              <div className="border-l-2 border-emerald-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block mb-2">III. Adoption simulator & Exchange KPIs</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Exchange Assessments */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">6. Knowledge Exchange & Efficiency</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {knowledgeExchangeAssessments.length > 0 ? (
+                        [...knowledgeExchangeAssessments].reverse().map(ka => (
+                          <div key={ka.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center text-[7.5px]">
+                            <div>
+                              <span className="font-bold text-cyan-300 text-[8.5px] block">{ka.evaluationPeriod} Evaluation</span>
+                              <div className="text-[7px] text-slate-500 mt-1">
+                                <div>Transfer Effectiveness: {ka.transferEffectivenessScore}%</div>
+                                <div>Learning Trend: <strong className="text-emerald-450">{ka.learningTrend}</strong></div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">Exchange Efficiency: {ka.collaborationEfficiency}%</span>
+                              <span className="text-slate-550 text-[7px] block">Reuse Rate: {ka.knowledgeReuseRate}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No knowledge assessments history recorded.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scenario Simulator */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">7. Adoption simulator</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {innovationScenarios.length > 0 ? (
+                        [...innovationScenarios].reverse().map(os => (
+                          <div key={os.scenarioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{os.name}</span>
+                              <span className="text-purple-400">Uncertainty: {os.technicalUncertainty}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1.5 space-y-0.5 font-sans">
+                              <div>Estimated Investment: <strong className="text-emerald-450">${os.estimatedInvestmentCost}</strong></div>
+                              <div>Simulated Adoption: {os.simulatedAdoptionRate}%</div>
+                              <div>Projected Maturity Delta: +{os.projectedMaturityGainMonths} months</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No adoption scenarios simulated.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Intelligence */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">IV. Innovation Intelligence & Lineage Trace</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Recommendations */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">8. Innovation recommendations Queue</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {innovationRecommendations.length > 0 ? (
+                        innovationRecommendations.map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{rec.recommendationType}</span>
+                              <span className="text-purple-400">{rec.recommendationStatus}</span>
+                            </div>
+                            <p className="text-[7.5px] text-slate-450 italic mt-1">"{rec.rationale}"</p>
+                            <div className="border-t border-slate-800 pt-1.5 mt-1.5 text-[7px] text-slate-500 grid grid-cols-2 gap-1.5">
+                              <div>Confidence: <strong className="text-emerald-400">{rec.confidenceScore}%</strong></div>
+                              <div>Maturity Gain: TRL +{rec.estimatedBenefit.maturityGainTRL}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No innovation recommendations proposed.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Evidence Traceability */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">9. Evidence Traceability</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {innovationRecommendations.length > 0 ? (
+                        [...innovationRecommendations].reverse().map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-[8px] font-bold text-cyan-300">Rec ID: {rec.recommendationId.substring(4, 10)}</span>
+                            <div className="text-[7.5px] text-slate-500 font-sans mt-1 space-y-1">
+                              <div>Domain ID: <strong className="text-purple-400">{rec.domainId}</strong></div>
                               <div className="border-t border-slate-850 pt-1">
                                 <strong>Trace:</strong> {rec.evidenceSources.join(", ")}
                               </div>
