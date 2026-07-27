@@ -31,6 +31,7 @@ import { activePortfolioVerificationContributor } from "../../../../intelligence
 import { activeOptimizationVerificationContributor } from "../../../../intelligence/verification/OptimizationVerificationContributor";
 import { activeStrategicVerificationContributor } from "../../../../intelligence/verification/StrategicVerificationContributor";
 import { activeEconomicsVerificationContributor } from "../../../../intelligence/verification/EconomicsVerificationContributor";
+import { activeAdaptiveGovernanceVerificationContributor } from "../../../../intelligence/verification/AdaptiveGovernanceVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -147,6 +148,10 @@ export class VerificationEngine {
     // Evaluate Engineering Economics checks
     const economicsAsserts = activeEconomicsVerificationContributor.verifyEconomicsEcosystem();
     economicsAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Adaptive Governance checks
+    const governanceAsserts = activeAdaptiveGovernanceVerificationContributor.verifyGovernanceEcosystem();
+    governanceAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

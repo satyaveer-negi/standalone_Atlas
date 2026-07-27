@@ -217,6 +217,12 @@ import type { BenefitRealizationPlan } from "../../services/intelligence/economi
 import type { PortfolioValueAssessment } from "../../services/intelligence/economics/PortfolioValueAssessment";
 import type { EconomicScenario } from "../../services/intelligence/economics/EconomicScenario";
 import type { ValueForecast } from "../../services/intelligence/economics/ValueForecast";
+import { activeAdaptiveGovernanceRepository } from "../../services/intelligence/repository/AdaptiveGovernanceRepository";
+import type { AdaptivePolicyModel } from "../../services/intelligence/governance/AdaptivePolicyModel";
+import type { GovernancePerformanceAssessment } from "../../services/intelligence/governance/GovernancePerformanceAssessment";
+import type { PolicyImpactAssessment } from "../../services/intelligence/governance/PolicyImpactAssessment";
+import type { GovernanceScenario } from "../../services/intelligence/governance/GovernanceScenario";
+import type { PolicyEvolutionRecommendation } from "../../services/intelligence/governance/PolicyEvolutionRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -443,6 +449,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [portfolioValueAssessments, setPortfolioValueAssessments] = useState<PortfolioValueAssessment[]>([]);
   const [economicScenarios, setEconomicScenarios] = useState<EconomicScenario[]>([]);
   const [valueForecasts, setValueForecasts] = useState<ValueForecast[]>([]);
+  const [adaptivePolicies, setAdaptivePolicies] = useState<AdaptivePolicyModel[]>([]);
+  const [governancePerformanceAssessments, setGovernancePerformanceAssessments] = useState<GovernancePerformanceAssessment[]>([]);
+  const [policyImpactAssessments, setPolicyImpactAssessments] = useState<PolicyImpactAssessment[]>([]);
+  const [governanceScenarios, setGovernanceScenarios] = useState<GovernanceScenario[]>([]);
+  const [policyEvolutionRecommendations, setPolicyEvolutionRecommendations] = useState<PolicyEvolutionRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2789,6 +2800,129 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerPolicySetup = () => {
+    const policyId = `pol-${Date.now()}`;
+
+    // 1. Adaptive Policy Model
+    const policy: AdaptivePolicyModel = {
+      policyId,
+      title: "Wind Microgrid Grid-Frequency Load Balancing Policy",
+      description: "Applies dynamic load clamping limits based on grid feedback telemetry",
+      policyVersion: 2,
+      scope: "Portfolio",
+      rules: ["Rule 1: Clamping limit must stay under 400MW load buffers."],
+      policyConstraints: {
+        immutableRules: ["Rule 1: Clamping limit must stay under 400MW load buffers."],
+        configurableRules: ["Clamping buffer adjustments can execute with 90% confidence score metrics."]
+      },
+      triggerConditions: ["Avg response time > 200ms"],
+      approvalAuth: "Strategic Leadership Council",
+      status: "Active",
+      lastUpdated: new Date().toISOString()
+    };
+    activeAdaptiveGovernanceRepository.savePolicy(policy);
+
+    // 2. Governance Performance Assessment
+    const pa: GovernancePerformanceAssessment = {
+      assessmentId: `assess-gov-${Date.now()}`,
+      evaluationPeriod: "Q1-2026",
+      complianceRate: 98.5,
+      missionSuccessCorrelation: 96,
+      realizedValueAlignment: 94,
+      averageDecisionLatencyMs: 450,
+      effectivenessScore: 97.4,
+      trend: "Improving",
+      bottlenecks: ["Stage 2 review latency bottleneck"]
+    };
+    activeAdaptiveGovernanceRepository.saveAssessment(pa);
+
+    // Refresh UI States
+    setAdaptivePolicies(activeAdaptiveGovernanceRepository.getPoliciesList());
+    setGovernancePerformanceAssessments(activeAdaptiveGovernanceRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Governance Setup] Initialized Adaptive Policy: ${policy.title} (v${policy.policyVersion}). Assessed performance effectiveness: ${pa.effectivenessScore}%, Trend: ${pa.trend}.`
+    ]);
+  };
+
+  const handleTriggerPolicySimulation = () => {
+    if (adaptivePolicies.length === 0) {
+      setMockLogs(prev => [...prev, `[Governance Alert] Error: No active adaptive policies. Click Deploy Policy first.`]);
+      return;
+    }
+
+    const latestPolicy = adaptivePolicies[adaptivePolicies.length - 1];
+
+    // 1. Policy Impact Assessment
+    const impactAssessmentId = `impact-gov-${Date.now()}`;
+    const ia: PolicyImpactAssessment = {
+      impactAssessmentId,
+      policyId: latestPolicy.policyId,
+      targetVersion: latestPolicy.policyVersion + 1,
+      estimatedRiskChange: -12.5,
+      projectedCostChange: -15000,
+      projectedNPVDelta: 35000,
+      affectedPortfolioIds: ["portfolio-mock-01"],
+      affectedPolicyIds: ["pol-secondary-load-01"],
+      safetyBoundaryCheck: "Passed",
+      assessedDate: new Date().toISOString()
+    };
+    activeAdaptiveGovernanceRepository.saveImpact(ia);
+
+    // 2. Governance Scenario
+    const scenarioId = `scen-gov-${Date.now()}`;
+    const gs: GovernanceScenario = {
+      scenarioId,
+      name: "Fast-Track Approval Pipeline",
+      description: "Bypasses secondary audit buffers under critical priority conditions",
+      workflowStages: [
+        {
+          id: "s1",
+          stage: "Assurance Verification Audit Run",
+          approverRole: "Assurance Lead Analyst",
+          expectedDurationDays: 1
+        },
+        {
+          id: "s2",
+          stage: "Council Signature Enforcement Block",
+          approverRole: "Strategic Council Chairperson",
+          expectedDurationDays: 2
+        }
+      ],
+      simulatedThroughput: 8.5,
+      simulatedApprovalDelayDays: 3,
+      riskIndex: 12.0,
+      scenarioStatus: "Simulated"
+    };
+    activeAdaptiveGovernanceRepository.saveScenario(gs);
+
+    // 3. Policy Evolution Recommendation
+    const recommendationId = `rec-gov-${Date.now()}`;
+    const rec: PolicyEvolutionRecommendation = {
+      recommendationId,
+      policyId: latestPolicy.policyId,
+      currentVersion: latestPolicy.policyVersion,
+      recommendedVersion: latestPolicy.policyVersion + 1,
+      rationale: "Optimizes clamp thresholds to leverage wind generator capacities",
+      confidenceScore: 94.5,
+      evidenceSources: ["economics-real-model-26"],
+      constitutionalPillarsChecked: ["Pillar 1 Invariant (Runtime vs Gov)", "Pillar 2 Invariant (Resilience Guards)"],
+      recommendationStatus: "Proposed"
+    };
+    activeAdaptiveGovernanceRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setPolicyImpactAssessments(activeAdaptiveGovernanceRepository.getImpactsList());
+    setGovernanceScenarios(activeAdaptiveGovernanceRepository.getScenariosList());
+    setPolicyEvolutionRecommendations(activeAdaptiveGovernanceRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Policy Simulation] Proposed Evolution: v${rec.currentVersion} ➔ v${rec.recommendedVersion} (Confidence: ${rec.confidenceScore}%). Simulated Scenario approval delay: ${gs.simulatedApprovalDelayDays} days. Impact: Risk delta ${ia.estimatedRiskChange}%, Safety bounds: ${ia.safetyBoundaryCheck}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3152,6 +3286,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             💰 Economics Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("adaptiveGovernance")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "adaptiveGovernance"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            ⚖️ Governance Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -8367,6 +8511,202 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-650 italic">No value forecasts projected.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "adaptiveGovernance" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">⚖️ ENTERPRISE ADAPTIVE GOVERNANCE & POLICY INTELLIGENCE STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Evolving versioned governance rules and approval workflow pipelines based on verified operational, strategic, and economic outcomes evidence</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerPolicySetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Policy
+                  </button>
+                  <button
+                    onClick={handleTriggerPolicySimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Evolution
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Policy & Rules Matrix */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Policy & Rules Matrix</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {adaptivePolicies.length > 0 ? (
+                      [...adaptivePolicies].reverse().map(policy => (
+                        <div key={policy.policyId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">{policy.title}</span>
+                            <span className="text-purple-400">v{policy.policyVersion}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-450 italic">"{policy.description}"</p>
+                          <div className="text-[7.5px] text-slate-400 space-y-1 my-1">
+                            <div>Scope: <strong>{policy.scope}</strong></div>
+                            <div className="border-t border-slate-800 pt-1 mt-1">
+                              <span className="text-red-400 font-bold block text-[7px] uppercase tracking-wider">Immutable Rules:</span>
+                              <ul className="list-disc pl-3 text-[7px] text-slate-300">
+                                {policy.policyConstraints.immutableRules.map((rule, idx) => (
+                                  <li key={idx}>{rule}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="border-t border-slate-800 pt-1">
+                              <span className="text-emerald-400 font-bold block text-[7px] uppercase tracking-wider">Configurable Rules:</span>
+                              <ul className="list-disc pl-3 text-[7px] text-slate-300">
+                                {policy.policyConstraints.configurableRules.map((rule, idx) => (
+                                  <li key={idx}>{rule}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No adaptive policies active. Click Deploy Policy.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Policy Impact Assessment */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Proposed Policy Impact Dashboard</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {policyImpactAssessments.length > 0 ? (
+                      [...policyImpactAssessments].reverse().map(impact => (
+                        <div key={impact.impactAssessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Target version: v{impact.targetVersion}</span>
+                            <span className={`px-1.5 rounded text-[7px] font-bold ${
+                              impact.safetyBoundaryCheck === "Passed" ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"
+                            }`}>Safety Bounds: {impact.safetyBoundaryCheck}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-[7.5px] text-slate-400 border-b border-slate-850 pb-1 mb-1 font-sans">
+                            <div>Risk Delta: <span className="text-emerald-450">{impact.estimatedRiskChange}%</span></div>
+                            <div>Cost Delta: <span className="text-emerald-450">${impact.projectedCostChange}</span></div>
+                            <div>NPV Delta: <span className="text-emerald-450">${impact.projectedNPVDelta}</span></div>
+                          </div>
+                          <div className="flex justify-between text-[7px] text-slate-500 font-sans">
+                            <span>Cascaded Policies: {impact.affectedPolicyIds.join(", ")}</span>
+                            <span>Date: {impact.assessedDate.split("T")[0]}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No policy impact assessments run. Click Simulate Evolution.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Governance Performance Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Governance Performance Dashboard</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {governancePerformanceAssessments.length > 0 ? (
+                      [...governancePerformanceAssessments].reverse().map(pa => (
+                        <div key={pa.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8.5px] mb-1">
+                            <span className="text-cyan-300">Effectiveness: {pa.effectivenessScore}%</span>
+                            <span className="text-purple-400 font-bold">{pa.trend}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-300 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Compliance Rate:</span>
+                              <span className="text-emerald-400 font-bold">{pa.complianceRate}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Decision Latency:</span>
+                              <span className="text-slate-400">{pa.averageDecisionLatencyMs} ms</span>
+                            </div>
+                            <div className="text-[7px] text-slate-500 border-t border-slate-850/40 pt-1 mt-1">
+                              <div>Success Correlation: {pa.missionSuccessCorrelation}%</div>
+                              <div>Bottlenecks: {pa.bottlenecks.join(", ")}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No performance assessments recorded.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Scenario simulations and policy recommendations queue */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Governance Simulator */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Governance Approval Scenario Simulator</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {governanceScenarios.length > 0 ? (
+                      governanceScenarios.map(gs => (
+                        <div key={gs.scenarioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-[8.5px]">
+                            <span className="text-cyan-300">{gs.name}</span>
+                            <span className="text-purple-400">{gs.scenarioStatus}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-400 space-y-1.5 mt-1 font-sans">
+                            <div className="grid grid-cols-2 gap-1 text-[7px] text-slate-500">
+                              <div>Simulated Delay: <strong>{gs.simulatedApprovalDelayDays} days</strong></div>
+                              <div>Throughput Ratio: {gs.simulatedThroughput}/mo</div>
+                            </div>
+                            
+                            {/* Structured workflow stages loops */}
+                            <div className="space-y-1 mt-1 border-t border-slate-800 pt-1.5">
+                              {gs.workflowStages.map(stage => (
+                                <div key={stage.id} className="bg-slate-950/50 p-1 rounded text-[7px] flex justify-between">
+                                  <span>{stage.stage} ({stage.approverRole})</span>
+                                  <span className="text-cyan-350">{stage.expectedDurationDays}d</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic col-span-2">No approval scenarios simulated. Click Simulate Evolution.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Policy Evolution Queue */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Constitutional Policy Evolution Queue</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {policyEvolutionRecommendations.length > 0 ? (
+                      [...policyEvolutionRecommendations].reverse().map(rec => (
+                        <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-[8.5px]">
+                            <span className="text-cyan-300">v{rec.currentVersion} ➔ v{rec.recommendedVersion}</span>
+                            <span className="text-purple-400">{rec.recommendationStatus}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-450 font-sans my-1 space-y-1">
+                            <p className="italic">Rationale: "{rec.rationale}"</p>
+                            <div className="flex justify-between text-[7px] text-slate-500 border-t border-slate-850 pt-1 mt-1">
+                              <span>Confidence: <strong className="text-emerald-450">{rec.confidenceScore}%</strong></span>
+                              <span>Pillars Check: {rec.constitutionalPillarsChecked.length} Verified</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No recommendations proposed.</span>
                     )}
                   </div>
                 </div>
