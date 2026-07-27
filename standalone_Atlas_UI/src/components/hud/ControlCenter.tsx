@@ -192,6 +192,12 @@ import type { MissionObjective } from "../../services/intelligence/mission/Missi
 import type { MissionState } from "../../services/intelligence/mission/MissionState";
 import type { AdaptiveExecutionPlan } from "../../services/intelligence/mission/AdaptiveExecutionPlan";
 import type { MissionAssuranceAssessment } from "../../services/intelligence/mission/MissionAssuranceAssessment";
+import { activePortfolioRepository } from "../../services/intelligence/repository/PortfolioRepository";
+import type { MissionPortfolio } from "../../services/intelligence/portfolio/MissionPortfolio";
+import type { CrossMissionDependency } from "../../services/intelligence/portfolio/CrossMissionDependency";
+import type { ResourceAllocationPlan } from "../../services/intelligence/portfolio/ResourceAllocationPlan";
+import type { SystemOrchestrator } from "../../services/intelligence/portfolio/SystemOrchestrator";
+import type { PortfolioAssessment } from "../../services/intelligence/portfolio/PortfolioAssessment";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -397,6 +403,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [missionStatesList, setMissionStatesList] = useState<MissionState[]>([]);
   const [adaptivePlans, setAdaptivePlans] = useState<AdaptiveExecutionPlan[]>([]);
   const [missionAssuranceAssessments, setMissionAssuranceAssessments] = useState<MissionAssuranceAssessment[]>([]);
+  const [missionPortfolios, setMissionPortfolios] = useState<MissionPortfolio[]>([]);
+  const [crossMissionDependencies, setCrossMissionDependencies] = useState<CrossMissionDependency[]>([]);
+  const [resourceAllocationPlans, setResourceAllocationPlans] = useState<ResourceAllocationPlan[]>([]);
+  const [systemOrchestrators, setSystemOrchestrators] = useState<SystemOrchestrator[]>([]);
+  const [portfolioAssessmentsList, setPortfolioAssessmentsList] = useState<PortfolioAssessment[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2168,6 +2179,183 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerPortfolioOrchestration = () => {
+    const portfolioId = `portfolio-${Date.now()}`;
+    
+    // 1. Create portfolio
+    const mp: MissionPortfolio = {
+      portfolioId,
+      name: "Wind Energy System-of-Systems Evolution",
+      description: "Coordinating turbines, grid arrays, and safety controllers",
+      owner: "System Orchestrator Board",
+      organizationId: "org-wind-corp-01",
+      priority: "High",
+      status: "Active",
+      missionIds: ["mission-01", "mission-02"],
+      portfolioObjectives: [
+        "Maintain total active load dispatch threshold above 300MW",
+        "Minimize thermal cycle load fatigue indices"
+      ],
+      strategicGoals: [
+        "ISO 26262 functional safety bounds compliance",
+        "EIOS pillar runtime invariants checks satisfaction"
+      ],
+      portfolioConstraints: ["Budget maximum capacity ceiling at $2M USD"],
+      portfolioKPIs: ["Resource utilization rate >= 90%"],
+      createdDate: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+    activePortfolioRepository.savePortfolio(mp);
+
+    // 2. Save resource allocation plans
+    const rapCpu: ResourceAllocationPlan = {
+      allocationId: `rap-cpu-${Date.now()}`,
+      resourceType: "CPU",
+      availableCapacity: 100,
+      requestedCapacity: 85,
+      allocatedCapacity: 75,
+      reservedCapacity: 10,
+      utilization: 85,
+      priorityRules: ["Reserve remaining CPU bandwidth for wind turbine microgrid telemetry overrides"]
+    };
+    const rapGpu: ResourceAllocationPlan = {
+      allocationId: `rap-gpu-${Date.now()}`,
+      resourceType: "GPU",
+      availableCapacity: 100,
+      requestedCapacity: 90,
+      allocatedCapacity: 80,
+      reservedCapacity: 10,
+      utilization: 90,
+      priorityRules: ["Preempt neural network load predictor iterations under heavy thermal load events"]
+    };
+    const rapStorage: ResourceAllocationPlan = {
+      allocationId: `rap-store-${Date.now()}`,
+      resourceType: "Storage",
+      availableCapacity: 100,
+      requestedCapacity: 60,
+      allocatedCapacity: 50,
+      reservedCapacity: 10,
+      utilization: 60,
+      priorityRules: ["Store black-box turbine fatigue telemetry records continuously"]
+    };
+    const rapNet: ResourceAllocationPlan = {
+      allocationId: `rap-net-${Date.now()}`,
+      resourceType: "Network",
+      availableCapacity: 100,
+      requestedCapacity: 75,
+      allocatedCapacity: 70,
+      reservedCapacity: 5,
+      utilization: 75,
+      priorityRules: ["Isolate inter-grid traffic from operational telemetry query latency bands"]
+    };
+    activePortfolioRepository.saveResourcePlan(rapCpu);
+    activePortfolioRepository.saveResourcePlan(rapGpu);
+    activePortfolioRepository.saveResourcePlan(rapStorage);
+    activePortfolioRepository.saveResourcePlan(rapNet);
+
+    // 3. System Orchestrator config
+    const orchestratorId = `orch-${Date.now()}`;
+    const so: SystemOrchestrator = {
+      orchestratorId,
+      managedMissionIds: ["mission-01", "mission-02"],
+      managedTwinIds: ["twin-01", "twin-02"],
+      activePolicies: ["Pol-Safety-First", "Pol-Budget-Clamp"],
+      executionMode: "Hybrid",
+      healthStatus: "Normal",
+      orchestrationStrategy: "Balanced"
+    };
+    activePortfolioRepository.saveOrchestrator(so);
+
+    // 4. Initial Portfolio Assessment
+    const pa: PortfolioAssessment = {
+      assessmentId: `pa-assess-${Date.now()}`,
+      portfolioId,
+      overallHealth: 94.2,
+      completionProbability: 95.5,
+      resourceEfficiency: 92,
+      riskIndex: 12.5,
+      strategicAlignment: 96.4,
+      portfolioResilience: 93.8,
+      portfolioThroughput: 310.0,
+      assessmentDate: new Date().toISOString()
+    };
+    activePortfolioRepository.saveAssessment(pa);
+
+    // Refresh UI States
+    setMissionPortfolios(activePortfolioRepository.getPortfoliosList());
+    setResourceAllocationPlans(activePortfolioRepository.getResourcePlansList());
+    setSystemOrchestrators(activePortfolioRepository.getOrchestratorsList());
+    setPortfolioAssessmentsList(activePortfolioRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Portfolio Control] Initialized Mission Portfolio: ${mp.name}. Execution mode: ${so.executionMode} (Strategy: ${so.orchestrationStrategy}). Assessment overall health: ${pa.overallHealth}%.`
+    ]);
+  };
+
+  const handleTriggerOptimizationPass = () => {
+    if (missionPortfolios.length === 0) {
+      setMockLogs(prev => [...prev, `[Portfolio Alert] Error: No portfolios active. Click Launch Portfolio first.`]);
+      return;
+    }
+
+    const latestPortfolio = missionPortfolios[missionPortfolios.length - 1];
+    
+    // Update portfolio status
+    latestPortfolio.status = "Optimizing";
+    latestPortfolio.lastUpdated = new Date().toISOString();
+    activePortfolioRepository.savePortfolio(latestPortfolio);
+
+    // Register cross mission dependency
+    const dep: CrossMissionDependency = {
+      dependencyId: `dep-${Date.now()}`,
+      sourceMissionId: "mission-01",
+      targetMissionId: "mission-02",
+      dependencyType: "Temporal",
+      criticality: "High",
+      blocking: true,
+      relationshipStrength: 0.95,
+      impactRule: "Delay in mission-01 propagates a delay of up to 4 hours in mission-02."
+    };
+    activePortfolioRepository.saveDependency(dep);
+
+    // Rebalance allocated capacities (reducing CPU slightly to balance GPU loads)
+    const list = activePortfolioRepository.getResourcePlansList();
+    for (const res of list) {
+      if (res.resourceType === "CPU") {
+        res.allocatedCapacity = 68; // Optimized from 75
+        res.utilization = 78;
+        activePortfolioRepository.saveResourcePlan(res);
+      }
+    }
+
+    // Register a new Portfolio Assessment showing optimization results
+    const pa: PortfolioAssessment = {
+      assessmentId: `pa-assess-opt-${Date.now()}`,
+      portfolioId: latestPortfolio.portfolioId,
+      overallHealth: 98.4, // Improved health score
+      completionProbability: 98.9,
+      resourceEfficiency: 97.2, // Improved resource efficiency
+      riskIndex: 8.5, // Reduced risk
+      strategicAlignment: 99.0,
+      portfolioResilience: 96.5,
+      portfolioThroughput: 325.0,
+      assessmentDate: new Date().toISOString()
+    };
+    activePortfolioRepository.saveAssessment(pa);
+
+    // Refresh UI States
+    setMissionPortfolios(activePortfolioRepository.getPortfoliosList());
+    setCrossMissionDependencies(activePortfolioRepository.getDependenciesList());
+    setResourceAllocationPlans(activePortfolioRepository.getResourcePlansList());
+    setPortfolioAssessmentsList(activePortfolioRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Portfolio Optimization] Execution strategy re-allocated CPU demand. Dependencies registered: mission-01 ➔ mission-02. Portfolio Health improved to ${pa.overallHealth}%.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -2491,6 +2679,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🔋 Resilience Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("portfolioIntelligence")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "portfolioIntelligence"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🌐 Portfolio Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -6945,6 +7143,190 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-655 italic">No missions planned. Launch mission.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "portfolioIntelligence" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🌐 SYSTEM-OF-SYSTEMS ORCHESTRATION & PORTFOLIO INTELLIGENCE</h3>
+                  <p className="text-[10px] text-slate-505">Enterprise multi-mission strategic portfolios scheduler, shared resource allocation optimization plans, and cross-mission dependency graph trees</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerPortfolioOrchestration}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Launch Portfolio
+                  </button>
+                  <button
+                    onClick={handleTriggerOptimizationPass}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Optimize Resources
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Portfolio Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Active Portfolio Mappings</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {missionPortfolios.length > 0 ? (
+                      [...missionPortfolios].reverse().map(mp => (
+                        <div key={mp.portfolioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">{mp.name}</span>
+                            <span className="text-purple-400">{mp.status}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-450 italic">"{mp.description}"</p>
+                          <div className="text-[7px] text-slate-500 space-y-0.5">
+                            <div>Org: {mp.organizationId}</div>
+                            <div>KPIs: {mp.portfolioKPIs.join(", ")}</div>
+                            <div className="text-red-400">Constraints: {mp.portfolioConstraints.join(", ")}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No portfolios initialized. Launch portfolio to configure.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Portfolio Dependency Matrix & Cascade Path */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Cross-Mission Mappings Matrix & Cascading Delays</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {crossMissionDependencies.length > 0 ? (
+                      [...crossMissionDependencies].reverse().map(dep => (
+                        <div key={dep.dependencyId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-purple-400">{dep.dependencyType} Dependency</span>
+                            <span className="text-cyan-300">{dep.criticality} Priority</span>
+                          </div>
+                          
+                          {/* Matrix representation of flow */}
+                          <div className="bg-slate-950 p-1 rounded font-sans text-[7.5px] flex items-center gap-2 border border-slate-850 my-1">
+                            <span className="bg-cyan-950 text-cyan-400 px-1 rounded font-mono">{dep.sourceMissionId}</span>
+                            <span className="text-slate-500 font-bold">&rarr;</span>
+                            <span className="bg-purple-950 text-purple-400 px-1 rounded font-mono">{dep.targetMissionId}</span>
+                            <span className={`ml-auto px-1 rounded text-[7px] font-bold ${dep.blocking ? "bg-red-950 text-red-450" : "bg-emerald-950 text-emerald-450"}`}>
+                              {dep.blocking ? "BLOCKING" : "NON-BLOCKING"}
+                            </span>
+                          </div>
+
+                          <p className="text-[7.5px] text-slate-400 italic">Impact Rule: "{dep.impactRule}"</p>
+                          <div className="text-[7px] text-slate-600 mt-1">Strength Index: {dep.relationshipStrength}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No inter-mission dependency matrices registered. Run Optimization to populate dependencies.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Portfolio Assessment Metrics */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Portfolio Health Assessments</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {portfolioAssessmentsList.length > 0 ? (
+                      [...portfolioAssessmentsList].reverse().map(pa => (
+                        <div key={pa.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Eval: {pa.assessmentId.substring(10, 18)}</span>
+                            <span className="text-purple-400">Health: {pa.overallHealth}%</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-350 space-y-0.5">
+                            <div>Completion Probability: <strong className="text-emerald-400">{pa.completionProbability}%</strong></div>
+                            <div>Resource Efficiency: {pa.resourceEfficiency}%</div>
+                            <div>Strategic Alignment: {pa.strategicAlignment}%</div>
+                            <div>Portfolio Resilience: {pa.portfolioResilience}%</div>
+                            <div className="text-cyan-300">Throughput Target: {pa.portfolioThroughput}MW</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No health assessments compiled.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Resource utilization forecasts and dynamic allocation strategies */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Resource Allocations with Forecast Projections */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Shared Infrastructure Allocation & Capacity Demands Forecast</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {resourceAllocationPlans.length > 0 ? (
+                      resourceAllocationPlans.map(res => {
+                        const usagePercentage = Math.round((res.allocatedCapacity / res.availableCapacity) * 100);
+                        const demandPercentage = Math.round((res.requestedCapacity / res.availableCapacity) * 100);
+
+                        return (
+                          <div key={res.allocationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1.5">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{res.resourceType} Resource</span>
+                              <span className="text-slate-500">Utilization: {res.utilization}%</span>
+                            </div>
+                            
+                            {/* Forecast metrics displays */}
+                            <div className="space-y-1">
+                              <div>
+                                <div className="flex justify-between text-[7px] text-slate-500">
+                                  <span>Allocated vs Available Capacity:</span>
+                                  <span className="text-slate-300">{res.allocatedCapacity} / {res.availableCapacity}</span>
+                                </div>
+                                <div className="w-full bg-slate-950 h-1.5 rounded overflow-hidden mt-0.5 flex">
+                                  <div className="bg-cyan-500 h-full" style={{ width: `${usagePercentage}%` }}></div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between text-[7px] text-slate-500">
+                                  <span>Requested Resource Demand:</span>
+                                  <span className="text-slate-300">{res.requestedCapacity} / {res.availableCapacity}</span>
+                                </div>
+                                <div className="w-full bg-slate-950 h-1.5 rounded overflow-hidden mt-0.5 flex">
+                                  <div className="bg-purple-500 h-full" style={{ width: `${demandPercentage}%` }}></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <p className="text-[7px] text-slate-500 leading-tight italic mt-1">Priority Rule: {res.priorityRules[0]}</p>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <span className="text-slate-655 italic col-span-2">No resource allocation profiles stored.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* System Orchestration Strategies */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. System-of-Systems Execution Strategy</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {systemOrchestrators.length > 0 ? (
+                      [...systemOrchestrators].reverse().map(orch => (
+                        <div key={orch.orchestratorId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block mb-1">Orchestrator ID: {orch.orchestratorId}</span>
+                          <div className="text-[7.5px] text-slate-400 space-y-1">
+                            <div>Execution Mode: <span className="text-slate-200">{orch.executionMode}</span></div>
+                            <div className="text-purple-400 font-bold">Optimization Strategy: {orch.orchestrationStrategy}</div>
+                            <div>Active Policies: <span className="text-slate-200">{orch.activePolicies.join(", ")}</span></div>
+                            <div className="text-emerald-400 font-bold">Orchestrator Health: {orch.healthStatus}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No operational orchestration strategy configured.</span>
                     )}
                   </div>
                 </div>
