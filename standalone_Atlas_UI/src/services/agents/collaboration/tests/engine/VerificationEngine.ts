@@ -26,6 +26,7 @@ import { activeTrustVerificationContributor } from "../../../../intelligence/ver
 import { activeAssuranceVerificationContributor } from "../../../../intelligence/verification/AssuranceVerificationContributor";
 import { activeRiskVerificationContributor } from "../../../../intelligence/verification/RiskVerificationContributor";
 import { activeResilienceVerificationContributor } from "../../../../intelligence/verification/ResilienceVerificationContributor";
+import { activeMissionVerificationContributor } from "../../../../intelligence/verification/MissionVerificationContributor";
 
 export class VerificationEngine {
   private scenarioRunner = new ScenarioRunner();
@@ -122,6 +123,10 @@ export class VerificationEngine {
     // Evaluate Engineering Resilience checks
     const resilienceAsserts = activeResilienceVerificationContributor.verifyResilienceEcosystem();
     resilienceAsserts.forEach(ast => report.addResult(ast));
+
+    // Evaluate Engineering Mission checks
+    const missionAsserts = activeMissionVerificationContributor.verifyMissionEcosystem();
+    missionAsserts.forEach(ast => report.addResult(ast));
 
     // 3. Evaluate EIOS Compliance
     const r1 = this.p1.verifyPillar1();

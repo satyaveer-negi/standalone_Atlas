@@ -186,6 +186,12 @@ import type { ResilienceAssessment } from "../../services/intelligence/resilienc
 import type { FailureEvent } from "../../services/intelligence/resilience/FailureEvent";
 import type { RecoveryExecution } from "../../services/intelligence/resilience/RecoveryExecution";
 import type { DependencyModel } from "../../services/intelligence/resilience/DependencyModel";
+import { activeMissionRepository } from "../../services/intelligence/repository/MissionRepository";
+import type { MissionDefinition } from "../../services/intelligence/mission/MissionDefinition";
+import type { MissionObjective } from "../../services/intelligence/mission/MissionObjective";
+import type { MissionState } from "../../services/intelligence/mission/MissionState";
+import type { AdaptiveExecutionPlan } from "../../services/intelligence/mission/AdaptiveExecutionPlan";
+import type { MissionAssuranceAssessment } from "../../services/intelligence/mission/MissionAssuranceAssessment";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -386,6 +392,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [resilienceAssessments, setResilienceAssessments] = useState<ResilienceAssessment[]>([]);
   const [failureEvents, setFailureEvents] = useState<FailureEvent[]>([]);
   const [dependencyModels, setDependencyModels] = useState<DependencyModel[]>([]);
+  const [missionDefinitions, setMissionDefinitions] = useState<MissionDefinition[]>([]);
+  const [missionObjectives, setMissionObjectives] = useState<MissionObjective[]>([]);
+  const [missionStatesList, setMissionStatesList] = useState<MissionState[]>([]);
+  const [adaptivePlans, setAdaptivePlans] = useState<AdaptiveExecutionPlan[]>([]);
+  const [missionAssuranceAssessments, setMissionAssuranceAssessments] = useState<MissionAssuranceAssessment[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2005,6 +2016,155 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     setMockLogs(prev => [
       ...prev,
       `[Graceful Degradation] Engaged fallback ContinuityPlan ${cp.continuityPlanId}. Minimum service level target is ${cp.minimumServiceLevels}%. System operates in degraded safe state.`
+    ]);
+  };
+
+  const handleTriggerMissionLaunch = () => {
+    // 1. Register MissionDefinition
+    const missionId = `mission-${Date.now()}`;
+    const md: MissionDefinition = {
+      missionId,
+      name: "Stabilization under Transient Winds",
+      targetSystemId: "twin-mock-system-01",
+      priority: "High",
+      status: "Executing",
+      owner: "Mission Assurance Board",
+      launchTimestamp: new Date().toISOString(),
+      estimatedDurationMs: 3600000,
+      missionType: "Operational",
+      successCriteria: ["Stabilize turbine blade dynamic load profiles", "Maintain continuous pitch operations"],
+      constraints: ["Load spikes must never trigger mechanical fatigue constitutional bounds"],
+      terminationConditions: ["Wind speeds exceed structural cutoff threshold of 45m/s"]
+    };
+    activeMissionRepository.saveDefinition(md);
+
+    // 2. Register MissionObjective
+    const objId = `obj-${Date.now()}`;
+    const mo: MissionObjective = {
+      objectiveId: objId,
+      description: "Turbine pitch cycle response time stabilizer",
+      metricTarget: 50,
+      metricUnit: "ms",
+      weight: 0.6,
+      currentFulfillment: 45,
+      status: "Met",
+      prerequisiteObjectiveIds: []
+    };
+    activeMissionRepository.saveObjective(mo);
+
+    // 3. Register MissionState
+    const stateId = `state-${Date.now()}`;
+    const ms: MissionState = {
+      stateId,
+      missionId,
+      activePhase: "Stabilization Loop Activation",
+      progressPercentage: 10,
+      currentSuccessConfidence: 95.8,
+      timestamp: new Date().toISOString(),
+      linkedTwinId: "twin-mock-system-01",
+      governanceDecisionRef: "dec-mock-gov-01",
+      operationalOutcomeRef: "out-mock-outcome-01"
+    };
+    activeMissionRepository.saveState(ms);
+
+    // 4. Register MissionAssuranceAssessment
+    const ra: MissionAssuranceAssessment = {
+      assessmentId: `ra-miss-${Date.now()}`,
+      successProbability: 95.8,
+      objectiveFulfillmentScore: 92,
+      assuranceConfidence: 94.5,
+      maturityLevel: 5,
+      assessmentDate: new Date().toISOString(),
+      trendScore: 0.85,
+      confidenceInterval: "92%-98%",
+      assessmentSource: "Autonomous Verification Engine",
+      contributingEvidenceRefs: ["resilience-assert-rto-achievement", "governance-p1"]
+    };
+    activeMissionRepository.saveAssessment(ra);
+
+    // Refresh UI States
+    setMissionDefinitions(activeMissionRepository.getDefinitionsList());
+    setMissionObjectives(activeMissionRepository.getObjectivesList());
+    setMissionStatesList(activeMissionRepository.getStatesList());
+    setMissionAssuranceAssessments(activeMissionRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Mission Control] Launched Mission: ${md.name}. Objectives linked. Success confidence registered: ${ms.currentSuccessConfidence}%.`
+    ]);
+  };
+
+  const handleTriggerAdaptiveReconfiguration = () => {
+    if (missionDefinitions.length === 0) {
+      setMockLogs(prev => [...prev, `[Mission Alert] Error: No missions currently executing. Launch mission first.`]);
+      return;
+    }
+
+    const latestMission = missionDefinitions[missionDefinitions.length - 1];
+
+    // 1. Trigger AdaptiveExecutionPlan
+    const planId = `ap-exec-${Date.now()}`;
+    const ap: AdaptiveExecutionPlan = {
+      planId,
+      triggerEventId: "evt-mock-event-01",
+      adaptationType: "RedundancyActivation",
+      actionsList: [
+        "Isolate degraded pitch sensor telemetry feed",
+        "Enable auxiliary pitch rate bypass loop",
+        "Apply governor fatigue limit parameters clamp overrides"
+      ],
+      executionStatus: "Closed"
+    };
+    activeMissionRepository.savePlan(ap);
+
+    // 2. Add objective progress updates
+    const list = activeMissionRepository.getObjectivesList();
+    if (list.length > 0) {
+      const o = list[list.length - 1];
+      o.currentFulfillment = 38; // ms achieved (better performance after hot redundancy active)
+      o.status = "Met";
+      activeMissionRepository.saveObjective(o);
+    }
+
+    // 3. Register state progression
+    const stateId = `state-ap-${Date.now()}`;
+    const ms: MissionState = {
+      stateId,
+      missionId: latestMission.missionId,
+      activePhase: "Auxiliary Active Standby Reconfiguration",
+      progressPercentage: 65,
+      currentSuccessConfidence: 99.2,
+      timestamp: new Date().toISOString(),
+      linkedTwinId: "twin-mock-system-01",
+      governanceDecisionRef: "dec-mock-gov-02",
+      operationalOutcomeRef: "out-mock-outcome-02"
+    };
+    activeMissionRepository.saveState(ms);
+
+    // 4. Generate new assurance assessment reflecting reconfigured safety margins
+    const ra: MissionAssuranceAssessment = {
+      assessmentId: `ra-miss-ap-${Date.now()}`,
+      successProbability: 99.2,
+      objectiveFulfillmentScore: 97.5,
+      assuranceConfidence: 98.4,
+      maturityLevel: 5,
+      assessmentDate: new Date().toISOString(),
+      trendScore: 0.95,
+      confidenceInterval: "98%-100%",
+      assessmentSource: "Autonomous Adaptive Orchestrator",
+      contributingEvidenceRefs: ["resilience-assert-rto-achievement", "governance-p1", "mock-rec-strat-01"]
+    };
+    activeMissionRepository.saveAssessment(ra);
+
+    // Refresh UI States
+    setMissionObjectives(activeMissionRepository.getObjectivesList());
+    setMissionStatesList(activeMissionRepository.getStatesList());
+    setAdaptivePlans(activeMissionRepository.getPlansList());
+    setMissionAssuranceAssessments(activeMissionRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Adaptive Control] Executed Adaptive Plan ${ap.planId} (Redundancy Activation). Mission progress advanced to 65%. Confidence level: ${ms.currentSuccessConfidence}%.`
     ]);
   };
 
@@ -6422,6 +6582,327 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-655 italic">No dependency models mapped. Run simulation.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+              </div>
+            </div>
+          )}
+
+          {activeTab === "engineeringResilience" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🔋 ENGINEERING RESILIENCE & OPERATIONAL CONTINUITY STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Staged incident recovery strategy logs, active service continuity fallback paths, and critical upstream/downstream dependency tracking</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerFailureSimulation}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Failure
+                  </button>
+                  <button
+                    onClick={handleTriggerGracefulDegradation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Engage Fallback
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Resilience Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Resilience Assessment Metrics</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {resilienceAssessments.length > 0 ? (
+                      [...resilienceAssessments].reverse().map((ra, idx) => (
+                        <div key={ra.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">Eval: {ra.assessmentId.substring(7, 15)}...</span>
+                            <span className="text-purple-400">Maturity: {ra.resilienceMaturity}/5</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Availability:</span>
+                            <strong className="text-emerald-400">{ra.achievedAvailability}%</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Recovery Rate:</span>
+                            <strong className="text-cyan-300">{ra.recoverySuccessRate}%</strong>
+                          </div>
+                          <div className="flex justify-between text-[7px] text-slate-500">
+                            <span>Compliance: {ra.continuityCompliance}%</span>
+                            <span>Degradation Eff: {ra.degradationEfficiency}%</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No assessments compiled. Trigger simulation.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Failure Scenarios */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Failures Catalogue (Failure Scenarios)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {failureScenarios.length > 0 ? (
+                      [...failureScenarios].reverse().map(scen => (
+                        <div key={scen.scenarioId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Scenario: {scen.scenarioId}</span>
+                            <span className="text-purple-400">Type: {scen.failureType}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-300">Trigger: "{scen.trigger}" &rarr; Impact: "{scen.expectedImpact}"</p>
+                          <p className="text-[7.5px] text-slate-500 mt-1">Detection Method: {scen.detectionMethod}</p>
+                          <div className="flex justify-between text-[7px] text-slate-600 mt-1 border-t border-slate-850 pt-1">
+                            <span>Est Recovery: {scen.estimatedRecoveryTimeMs}ms</span>
+                            <span>Status: {scen.simulationStatus}</span>
+                            <span className={`px-1.5 rounded ${scen.validationResult === "Pass" ? "bg-emerald-950 text-emerald-450" : "bg-red-955 text-red-400"}`}>
+                              Validation: {scen.validationResult}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No failure scenarios simulated.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Active Continuity Plans */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Safe Degraded Operating Mode (Continuity)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {continuityPlans.length > 0 ? (
+                      [...continuityPlans].reverse().map(cp => (
+                        <div key={cp.continuityPlanId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block text-[8px]">Plan: {cp.continuityPlanId}</span>
+                          <p className="text-[7.5px] text-slate-300 mt-1">Min Service Level: <strong className="text-purple-400">{cp.minimumServiceLevels}%</strong></p>
+                          <div className="text-[7px] text-slate-500 mt-1">
+                            <div>Critical Services: {cp.criticalServices.join(", ")}</div>
+                            <div>Priorities: {cp.dependencyPriorities.join(", ")}</div>
+                            <div className="text-purple-400 font-bold mt-1">Escalation: {cp.escalationPaths[0]}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No degraded continuity states active. Run Graceful Degradation fallback.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Recovery execution runs and dependencies mapper */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Recovery Executions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Automated Recovery Strategies Executions Ledger</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {recoveryExecutions.length > 0 ? (
+                      [...recoveryExecutions].reverse().map(exec => (
+                        <div key={exec.executionId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Execution: {exec.executionId}</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              <div>Strategy Ref: {exec.strategyReferenceId}</div>
+                              <div>Operator: {exec.operatorId}</div>
+                              <div className="text-purple-400 font-bold mt-1">Validation Assertions: "{exec.validationResults.join(", ")}"</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              exec.successStatus === "Success" ? "bg-emerald-950 text-emerald-450" : "bg-red-955 text-red-400"
+                            }`}>{exec.successStatus}</span>
+                            <span className="text-slate-550 text-[7px] block">Start: {exec.startTime.substring(11, 19)}</span>
+                            <span className="text-slate-550 text-[7px] block">End: {exec.completionTime.substring(11, 19)}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No recovery runs registered.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dependency Mapping */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Assets Upstream/Downstream Dependency Models</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {dependencyModels.length > 0 ? (
+                      [...dependencyModels].reverse().map(dm => (
+                        <div key={dm.modelId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block mb-1">Model ID: {dm.modelId}</span>
+                          <div className="text-[7.5px] text-slate-400 space-y-1">
+                            <div>Upstream: <span className="text-slate-200">{dm.upstreamDependencies.join(", ")}</span></div>
+                            <div>Downstream: <span className="text-slate-200">{dm.downstreamDependencies.join(", ")}</span></div>
+                            <div className="text-emerald-400 font-bold">Redundancy: {dm.redundancyRelationships.join(", ")}</div>
+                            <div className="text-red-400 font-bold">Single Points of Failure: {dm.singlePointsOfFailure.join(", ")}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No dependency models mapped. Run simulation.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "engineeringResilience" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🎯 ENGINEERING MISSION ASSURANCE & ADAPTIVE OPERATIONS</h3>
+                  <p className="text-[10px] text-slate-505">Dynamic reconfiguration actions, objective metric targets, success assurance trends, and twin coordination telemetry maps</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerMissionLaunch}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Launch Mission
+                  </button>
+                  <button
+                    onClick={handleTriggerAdaptiveReconfiguration}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Trigger Adaptation
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Mission Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Active Mission Execution States</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {missionStatesList.length > 0 ? (
+                      [...missionStatesList].reverse().map(ms => (
+                        <div key={ms.stateId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">State: {ms.stateId.substring(6, 14)}...</span>
+                            <span className="text-purple-400">{ms.progressPercentage}% Progress</span>
+                          </div>
+                          <div>Phase: {ms.activePhase}</div>
+                          <div>Twin ID: {ms.linkedTwinId}</div>
+                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                            <span>Confidence: <strong className="text-emerald-400">{ms.currentSuccessConfidence}%</strong></span>
+                            <span>Gov: {ms.governanceDecisionRef.substring(4, 10)}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No missions active. Launch mission.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Mission Objectives */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Prioritized Goals (Mission Objectives)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {missionObjectives.length > 0 ? (
+                      [...missionObjectives].reverse().map(mo => (
+                        <div key={mo.objectiveId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Obj: {mo.objectiveId} ({mo.status})</span>
+                            <span className="text-slate-500">Weight: {mo.weight}</span>
+                          </div>
+                          <p className="text-[8px] text-slate-300">Goal: "{mo.description}"</p>
+                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                            <span>Target: {mo.metricTarget}{mo.metricUnit}</span>
+                            <span>Current: <strong className="text-emerald-400">{mo.currentFulfillment}{mo.metricUnit}</strong></span>
+                            <span>Prerequisites: {mo.prerequisiteObjectiveIds.length || "None"}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No mission objectives registered.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Assurance Metrics */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Mission Assurance Metrics</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {missionAssuranceAssessments.length > 0 ? (
+                      [...missionAssuranceAssessments].reverse().map(ma => (
+                        <div key={ma.assessmentId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Assur ID: {ma.assessmentId.substring(8, 16)}</span>
+                            <span className="text-purple-400">CI: {ma.confidenceInterval}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-300 space-y-1">
+                            <div>Success Probability: <strong className="text-emerald-400">{ma.successProbability}%</strong></div>
+                            <div>Fulfillment Score: {ma.objectiveFulfillmentScore}%</div>
+                            <div>Assurance Confidence: {ma.assuranceConfidence}%</div>
+                            <div className="text-purple-400">Trend: {ma.trendScore} (Source: {ma.assessmentSource})</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No assurance assessments compiled.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Adaptive plans list and definitions catalogue */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Adaptive Reconfigurations */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Staged Adaptive Execution Plan & Actions Ledger</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {adaptivePlans.length > 0 ? (
+                      [...adaptivePlans].reverse().map(ap => (
+                        <div key={ap.planId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-slate-200">Plan: {ap.planId}</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1 leading-normal">
+                              <div>Adaptation Type: {ap.adaptationType}</div>
+                              <div className="text-purple-400 font-bold">Actions: {ap.actionsList.join(" &rarr; ")}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold block mb-1 ${
+                              ap.executionStatus === "Closed" ? "bg-emerald-950 text-emerald-450" : "bg-purple-950 text-purple-450"
+                            }`}>{ap.executionStatus}</span>
+                            <span className="text-slate-550 text-[7px] block">Trigger: {ap.triggerEventId}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No adaptation plans triggered.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mission Definitions */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Active Mission Profiles & Specifications</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {missionDefinitions.length > 0 ? (
+                      [...missionDefinitions].reverse().map(md => (
+                        <div key={md.missionId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <span className="font-bold text-cyan-300 block mb-1">{md.name} ({md.missionType})</span>
+                          <div className="text-[7.5px] text-slate-400 space-y-1">
+                            <div>Target: {md.targetSystemId}</div>
+                            <div>Constraints: {md.constraints.join(", ")}</div>
+                            <div className="text-red-400 font-bold">Cutoff Conditions: {md.terminationConditions.join(", ")}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No missions planned. Launch mission.</span>
                     )}
                   </div>
                 </div>
