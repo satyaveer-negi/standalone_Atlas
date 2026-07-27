@@ -223,6 +223,12 @@ import type { GovernancePerformanceAssessment } from "../../services/intelligenc
 import type { PolicyImpactAssessment } from "../../services/intelligence/governance/PolicyImpactAssessment";
 import type { GovernanceScenario } from "../../services/intelligence/governance/GovernanceScenario";
 import type { PolicyEvolutionRecommendation } from "../../services/intelligence/governance/PolicyEvolutionRecommendation";
+import { activeOrganizationRepository } from "../../services/intelligence/repository/OrganizationRepository";
+import type { OrganizationalCapabilityModel } from "../../services/intelligence/organization/OrganizationalCapabilityModel";
+import type { TransformationProgram } from "../../services/intelligence/organization/TransformationProgram";
+import type { OperatingModelAssessment } from "../../services/intelligence/organization/OperatingModelAssessment";
+import type { OrganizationalScenario } from "../../services/intelligence/organization/OrganizationalScenario";
+import type { TransformationRecommendation } from "../../services/intelligence/organization/TransformationRecommendation";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -454,6 +460,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [policyImpactAssessments, setPolicyImpactAssessments] = useState<PolicyImpactAssessment[]>([]);
   const [governanceScenarios, setGovernanceScenarios] = useState<GovernanceScenario[]>([]);
   const [policyEvolutionRecommendations, setPolicyEvolutionRecommendations] = useState<PolicyEvolutionRecommendation[]>([]);
+  const [orgCapabilityModels, setOrgCapabilityModels] = useState<OrganizationalCapabilityModel[]>([]);
+  const [transformationPrograms, setTransformationPrograms] = useState<TransformationProgram[]>([]);
+  const [operatingModelAssessments, setOperatingModelAssessments] = useState<OperatingModelAssessment[]>([]);
+  const [organizationalScenarios, setOrganizationalScenarios] = useState<OrganizationalScenario[]>([]);
+  const [transformationRecommendations, setTransformationRecommendations] = useState<TransformationRecommendation[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2923,6 +2934,139 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerOrganizationSetup = () => {
+    const capabilityId = `cap-${Date.now()}`;
+
+    // 1. Organizational Capability Model
+    const cm: OrganizationalCapabilityModel = {
+      capabilityId,
+      unitName: "Turbine Dynamics Division",
+      competencies: [
+        {
+          skillName: "Dynamic Governor Feedback Sensing",
+          rating: 4.2,
+          criticality: "High",
+          certifiedHeadcount: 12
+        }
+      ],
+      capabilityDimension: {
+        peopleScore: 85.0,
+        processScore: 78.0,
+        technologyScore: 90.0,
+        knowledgeScore: 92.5
+      },
+      headcount: 15,
+      utilizationPercentage: 80,
+      maturityLevel: "Defined",
+      gapIdentified: ["Insufficent sensory networks certified engineers"]
+    };
+    activeOrganizationRepository.saveCapability(cm);
+
+    // 2. Operating Model Assessment
+    const oma: OperatingModelAssessment = {
+      assessmentId: `assess-org-${Date.now()}`,
+      structureType: "Platform",
+      efficiencyRatio: 84.5,
+      decisionLatencyMultiplier: 1.15,
+      coordinationOverheadIndex: 24,
+      organizationalResilienceScore: 89.0,
+      organizationalValueTrend: "Improving",
+      assessmentDate: new Date().toISOString()
+    };
+    activeOrganizationRepository.saveAssessment(oma);
+
+    // Refresh UI States
+    setOrgCapabilityModels(activeOrganizationRepository.getCapabilitiesList());
+    setOperatingModelAssessments(activeOrganizationRepository.getAssessmentsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Org Setup] Initialized Capability Matrix: ${cm.unitName} (Headcount: ${cm.headcount}). Assessed platform structure efficiency: ${oma.efficiencyRatio}%, Resilience Score: ${oma.organizationalResilienceScore}%.`
+    ]);
+  };
+
+  const handleTriggerTransformationSimulation = () => {
+    // 1. Organizational Scenario
+    const scenarioId = `scen-org-${Date.now()}`;
+    const os: OrganizationalScenario = {
+      scenarioId,
+      name: "Dynamic Agile Topologies",
+      description: "Shift functional silos into integrated platform teams",
+      simulatedTeamsCount: 6,
+      reportingLayers: 3,
+      estimatedOperatingCost: 120000,
+      expectedExecutionVelocity: 35.0, // +35%
+      coordinationRiskIndex: 18.0,
+      simulatedApprovalDelayDays: 2.5,
+      scenarioStatus: "Simulated"
+    };
+    activeOrganizationRepository.saveScenario(os);
+
+    // 2. Transformation Program
+    const programId = `trans-${Date.now()}`;
+    const prog: TransformationProgram = {
+      programId,
+      title: "Distributed Wind Microgrid Operating Topologies Shift",
+      milestones: [
+        {
+          id: "m1",
+          description: "Sensory Networks Telemetry Setup",
+          status: "Completed",
+          targetDate: "2026-03-31",
+          dependencies: []
+        },
+        {
+          id: "m2",
+          description: "Dynamic Governor Loop Rollout",
+          status: "InFlight",
+          targetDate: "2026-06-30",
+          dependencies: ["m1"]
+        }
+      ],
+      transformationGateways: [
+        {
+          gate: "Gate 1: Telemetry Verification Checkpoint",
+          requiredEvidence: ["telemetry-assurance-verification-audit"],
+          approvalAuthority: "Strategic Leadership Council"
+        }
+      ],
+      targetBenefits: ["Execution Velocity +25%", "Coordination overhead reduced by 15%"],
+      risks: ["Integration latency spike"],
+      budget: 150000,
+      status: "Active"
+    };
+    activeOrganizationRepository.saveProgram(prog);
+
+    // 3. Transformation Recommendation
+    const recommendationId = `rec-org-${Date.now()}`;
+    const rec: TransformationRecommendation = {
+      recommendationId,
+      recommendationType: "Structure",
+      recommendedStructure: "Platform team topology",
+      rationale: "Aligns organizational structure directly to sensory telemetry flows",
+      confidenceScore: 92.0,
+      evidenceSources: ["gov-assert-evidence-traceability"],
+      targetMaturityTarget: "Optimizing",
+      estimatedBenefit: {
+        executionVelocity: 25.0,
+        costReduction: 15000,
+        governanceImprovement: 20.0
+      },
+      recommendationStatus: "Proposed"
+    };
+    activeOrganizationRepository.saveRecommendation(rec);
+
+    // Refresh UI States
+    setOrganizationalScenarios(activeOrganizationRepository.getScenariosList());
+    setTransformationPrograms(activeOrganizationRepository.getProgramsList());
+    setTransformationRecommendations(activeOrganizationRepository.getRecommendationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Transformation simulation] Proposing structural adaptation recommendation: ${rec.recommendedStructure} (Type: ${rec.recommendationType}, Confidence: ${rec.confidenceScore}%). Simulated Scenario operating cost: $${os.estimatedOperatingCost}, budget allocated: $${prog.budget}.`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -3296,6 +3440,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             ⚖️ Governance Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("adaptiveOrganization")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "adaptiveOrganization"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            👥 Organizational Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -8708,6 +8862,287 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                     ) : (
                       <span className="text-slate-650 italic">No recommendations proposed.</span>
                     )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "adaptiveOrganization" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">👥 ENTERPRISE ORGANIZATIONAL INTELLIGENCE & TRANSFORMATION STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Continuous optimization of team topologies, capability matrices, and enterprise operating structures based on verified governance, economic, and operational evidence</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerOrganizationSetup}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Org Matrix
+                  </button>
+                  <button
+                    onClick={handleTriggerTransformationSimulation}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Simulate Transformation
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: Capabilities */}
+              <div className="border-l-2 border-cyan-500/50 pl-2">
+                <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider block mb-2">I. Capabilities & Competence Framework</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Capability Matrix */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">1. Capability Matrix</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-450">
+                      {orgCapabilityModels.length > 0 ? (
+                        [...orgCapabilityModels].reverse().map(cm => (
+                          <div key={cm.capabilityId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-cyan-300 font-bold">{cm.unitName}</span>
+                            <div className="space-y-1 mt-1 text-[7.5px] text-slate-400 font-sans">
+                              {cm.competencies.map((comp, idx) => (
+                                <div key={idx} className="bg-slate-950/40 p-1 rounded flex justify-between">
+                                  <span>{comp.skillName} (Lvl {comp.rating})</span>
+                                  <span className="text-purple-400 font-bold">{comp.criticality}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic">No capabilities mapped. Click Deploy Org Matrix.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Workforce Dashboard */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">2. Workforce Dashboard</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {orgCapabilityModels.length > 0 ? (
+                        [...orgCapabilityModels].reverse().map(cm => (
+                          <div key={cm.capabilityId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8px] text-cyan-300">
+                              <span>Maturity: {cm.maturityLevel}</span>
+                              <span>Headcount: {cm.headcount}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1 space-y-1">
+                              <div>Capacity Utilization: <strong className="text-emerald-450">{cm.utilizationPercentage}%</strong></div>
+                              <div className="border-t border-slate-850 pt-1 text-[7px] text-slate-500">
+                                <strong>Gaps:</strong> {cm.gapIdentified.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No workforce capacity data.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Skill Heatmap */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">3. Multidimensional Dimensional Scores</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400 font-sans">
+                      {orgCapabilityModels.length > 0 ? (
+                        [...orgCapabilityModels].reverse().map(cm => (
+                          <div key={cm.capabilityId} className="bg-slate-900 p-2 border border-slate-855 rounded grid grid-cols-2 gap-1.5 text-[7px]">
+                            <div className="bg-slate-950 p-1 rounded">
+                              <span className="text-slate-500 block">People:</span>
+                              <span className="font-bold text-emerald-400">{cm.capabilityDimension.peopleScore}%</span>
+                            </div>
+                            <div className="bg-slate-950 p-1 rounded">
+                              <span className="text-slate-500 block">Process:</span>
+                              <span className="font-bold text-emerald-400">{cm.capabilityDimension.processScore}%</span>
+                            </div>
+                            <div className="bg-slate-950 p-1 rounded">
+                              <span className="text-slate-500 block">Technology:</span>
+                              <span className="font-bold text-emerald-400">{cm.capabilityDimension.technologyScore}%</span>
+                            </div>
+                            <div className="bg-slate-950 p-1 rounded">
+                              <span className="text-slate-500 block">Knowledge:</span>
+                              <span className="font-bold text-emerald-400">{cm.capabilityDimension.knowledgeScore}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No score vectors recorded.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Transformation */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">II. Transformation & Roadmapping</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Roadmap & Milestones */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">4. Roadmap & Milestones</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal">
+                      {transformationPrograms.length > 0 ? (
+                        transformationPrograms.map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <span className="font-bold text-cyan-300 text-[8.5px]">{prog.title}</span>
+                            <div className="space-y-1.5 mt-1 border-t border-slate-850 pt-1 text-[7px] text-slate-400 font-sans">
+                              {prog.milestones.map(m => (
+                                <div key={m.id} className="flex justify-between items-center bg-slate-950 p-1 rounded">
+                                  <span>{m.description} ({m.targetDate})</span>
+                                  <span className={`px-1 rounded text-[6.5px] font-bold ${
+                                    m.status === "Completed" ? "bg-emerald-950 text-emerald-450" : "bg-cyan-950 text-cyan-455"
+                                  }`}>{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No transformation roadmaps active. Click Simulate Transformation.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Transformation Gateways */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">5. Gateways & Budget</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {transformationPrograms.length > 0 ? (
+                        [...transformationPrograms].reverse().map(prog => (
+                          <div key={prog.programId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                            <div className="flex justify-between text-[8px] font-bold text-cyan-300">
+                              <span>Budget: ${prog.budget}</span>
+                              <span>Status: {prog.status}</span>
+                            </div>
+                            <div className="space-y-1.5 border-t border-slate-850 pt-1.5">
+                              {prog.transformationGateways.map((g, idx) => (
+                                <div key={idx} className="bg-slate-950 p-1 rounded flex flex-col gap-0.5 text-[7px]">
+                                  <span className="font-bold text-purple-400">{g.gate}</span>
+                                  <span className="text-slate-500">Required: {g.requiredEvidence.join(", ")}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No gateways tracked.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Simulation */}
+              <div className="border-l-2 border-emerald-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block mb-2">III. Topologies Scenario Simulation</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Operating Models */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">6. Operating Model Analytics</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {operatingModelAssessments.length > 0 ? (
+                        [...operatingModelAssessments].reverse().map(oma => (
+                          <div key={oma.assessmentId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-cyan-300 text-[8.5px] block">{oma.structureType} Model</span>
+                              <div className="text-[7px] text-slate-500 mt-1">
+                                <div>Overhead Index: {oma.coordinationOverheadIndex}/100</div>
+                                <div>Latency Delay: {oma.decisionLatencyMultiplier}x</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">Resilience: {oma.organizationalResilienceScore}%</span>
+                              <span className="text-slate-550 text-[7px] block">Efficiency: {oma.efficiencyRatio}%</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No operating models evaluated.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Simulator & Comparator */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">7. Scenario Simulator</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {organizationalScenarios.length > 0 ? (
+                        [...organizationalScenarios].reverse().map(os => (
+                          <div key={os.scenarioId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{os.name}</span>
+                              <span className="text-purple-400">Layers: {os.reportingLayers}</span>
+                            </div>
+                            <div className="text-[7.5px] text-slate-450 mt-1.5 space-y-0.5 font-sans">
+                              <div>Operating Cost: <strong className="text-emerald-450">${os.estimatedOperatingCost}</strong></div>
+                              <div>Velocity Shift: +{os.expectedExecutionVelocity}%</div>
+                              <div>Risk Index: {os.coordinationRiskIndex}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No scenarios simulated.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: Intelligence */}
+              <div className="border-l-2 border-purple-500/50 pl-2 mt-2">
+                <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider block mb-2">IV. Transformation Intelligence & Evidence</span>
+                <div className="grid grid-cols-3 gap-4 text-[9px] font-mono">
+                  {/* Recommendations */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">8. Transformation Recommendations Queue</span>
+                    <div className="grid grid-cols-2 gap-3 mt-1 leading-normal font-sans">
+                      {transformationRecommendations.length > 0 ? (
+                        transformationRecommendations.map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                            <div className="flex justify-between font-bold text-[8.5px]">
+                              <span className="text-cyan-300">{rec.recommendedStructure}</span>
+                              <span className="text-purple-400">{rec.recommendationType}</span>
+                            </div>
+                            <p className="text-[7.5px] text-slate-450 italic mt-1">"{rec.rationale}"</p>
+                            <div className="border-t border-slate-800 pt-1.5 mt-1.5 text-[7px] text-slate-500 grid grid-cols-2 gap-1.5">
+                              <div>Confidence: <strong className="text-emerald-400">{rec.confidenceScore}%</strong></div>
+                              <div>Cost Reduction: ${rec.estimatedBenefit.costReduction}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-655 italic col-span-2">No transformation recommendations proposed.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Evidence Explorer */}
+                  <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                    <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[9.5px]">9. Evidence Explorer</span>
+                    <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                      {transformationRecommendations.length > 0 ? (
+                        [...transformationRecommendations].reverse().map(rec => (
+                          <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
+                            <span className="text-[8px] font-bold text-cyan-300">Rec: {rec.recommendationId.substring(4, 10)}</span>
+                            <div className="text-[7.5px] text-slate-500 font-sans mt-1 space-y-1">
+                              <div>Maturity Target: <strong className="text-purple-400">{rec.targetMaturityTarget}</strong></div>
+                              <div className="border-t border-slate-850 pt-1">
+                                <strong>Evidence:</strong> {rec.evidenceSources.join(", ")}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-slate-650 italic">No evidence linkages.</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
