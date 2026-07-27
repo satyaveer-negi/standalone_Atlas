@@ -6780,50 +6780,92 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
               </div>
 
               <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
-                {/* 1. Mission Dashboard */}
+                {/* 1. Mission Dashboard with Visual Timeline */}
                 <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
-                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Active Mission Execution States</span>
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Active Mission & Phase Timeline</span>
                   <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
                     {missionStatesList.length > 0 ? (
-                      [...missionStatesList].reverse().map(ms => (
-                        <div key={ms.stateId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1">
-                          <div className="flex justify-between font-bold">
-                            <span className="text-cyan-300">State: {ms.stateId.substring(6, 14)}...</span>
-                            <span className="text-purple-400">{ms.progressPercentage}% Progress</span>
+                      [...missionStatesList].reverse().map(ms => {
+                        // Determine active timeline checkpoint node
+                        const isReconfigured = ms.progressPercentage >= 65;
+                        const isCompleted = ms.progressPercentage === 100;
+
+                        return (
+                          <div key={ms.stateId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                            <div className="flex justify-between font-bold">
+                              <span className="text-cyan-300">State: {ms.stateId.substring(6, 14)}...</span>
+                              <span className="text-purple-400">{ms.progressPercentage}% Progress</span>
+                            </div>
+                            
+                            {/* Visual Progress Checkpoint Timeline */}
+                            <div className="flex justify-between items-center text-[7px] text-slate-500 py-1 border-y border-slate-850/40 my-1 bg-slate-950/40 px-1 rounded">
+                              <span className="text-emerald-400 font-bold">Planned</span>
+                              <span className="text-slate-600">&rarr;</span>
+                              <span className="text-emerald-400 font-bold">Executing</span>
+                              <span className="text-slate-600">&rarr;</span>
+                              <span className={isReconfigured ? "text-purple-400 font-bold" : "text-slate-650"}>Adapted</span>
+                              <span className="text-slate-600">&rarr;</span>
+                              <span className={isCompleted ? "text-cyan-300 font-bold animate-pulse" : "text-slate-650"}>Completed</span>
+                            </div>
+
+                            <div>Phase: {ms.activePhase}</div>
+                            <div>Twin ID: {ms.linkedTwinId}</div>
+                            <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                              <span>Confidence: <strong className="text-emerald-400">{ms.currentSuccessConfidence}%</strong></span>
+                              <span>Gov: {ms.governanceDecisionRef.substring(4, 10)}</span>
+                            </div>
                           </div>
-                          <div>Phase: {ms.activePhase}</div>
-                          <div>Twin ID: {ms.linkedTwinId}</div>
-                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
-                            <span>Confidence: <strong className="text-emerald-400">{ms.currentSuccessConfidence}%</strong></span>
-                            <span>Gov: {ms.governanceDecisionRef.substring(4, 10)}</span>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <span className="text-slate-650 italic">No missions active. Launch mission.</span>
                     )}
                   </div>
                 </div>
 
-                {/* 2. Mission Objectives */}
+                {/* 2. Mission Objectives with Dependency Graph */}
                 <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
-                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Prioritized Goals (Mission Objectives)</span>
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Prioritized Goals & Prerequisite Dependency Graph</span>
                   <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
                     {missionObjectives.length > 0 ? (
-                      [...missionObjectives].reverse().map(mo => (
-                        <div key={mo.objectiveId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
-                          <div className="flex justify-between font-bold text-[8px] mb-1">
-                            <span className="text-cyan-300">Obj: {mo.objectiveId} ({mo.status})</span>
-                            <span className="text-slate-500">Weight: {mo.weight}</span>
+                      [...missionObjectives].reverse().map(mo => {
+                        // Check if prerequisites are satisfied
+                        const arePrereqsSatisfied = mo.prerequisiteObjectiveIds.every(preId => {
+                          const prereq = missionObjectives.find(x => x.objectiveId === preId);
+                          return prereq && prereq.status === "Met";
+                        });
+                        const isBlocked = mo.status !== "Met" && !arePrereqsSatisfied;
+
+                        return (
+                          <div key={mo.objectiveId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                            <div className="flex justify-between font-bold text-[8px] mb-1">
+                              <span className="text-cyan-300">Obj: {mo.objectiveId}</span>
+                              <span className={`px-1.5 rounded text-[7px] font-bold ${
+                                mo.status === "Met" 
+                                  ? "bg-emerald-950 text-emerald-450" 
+                                  : isBlocked 
+                                    ? "bg-red-950/60 text-red-400 border border-red-900/30" 
+                                    : "bg-yellow-950 text-yellow-450"
+                              }`}>
+                                {mo.status === "Met" ? "Met" : isBlocked ? "Blocked by Prerequisites" : "Ready / Pending"}
+                              </span>
+                            </div>
+                            <p className="text-[8px] text-slate-300">Goal: "{mo.description}"</p>
+                            
+                            {mo.prerequisiteObjectiveIds.length > 0 && (
+                              <div className="text-[7.5px] text-purple-400 mt-1 leading-normal font-sans">
+                                &bull; Prerequisite Path: {mo.prerequisiteObjectiveIds.join(", ")} &rarr; <span className="text-cyan-300 font-bold">{mo.objectiveId}</span>
+                              </div>
+                            )}
+
+                            <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                              <span>Target: {mo.metricTarget}{mo.metricUnit}</span>
+                              <span>Current: <strong className="text-emerald-400">{mo.currentFulfillment}{mo.metricUnit}</strong></span>
+                              <span>Weight: {mo.weight}</span>
+                            </div>
                           </div>
-                          <p className="text-[8px] text-slate-300">Goal: "{mo.description}"</p>
-                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
-                            <span>Target: {mo.metricTarget}{mo.metricUnit}</span>
-                            <span>Current: <strong className="text-emerald-400">{mo.currentFulfillment}{mo.metricUnit}</strong></span>
-                            <span>Prerequisites: {mo.prerequisiteObjectiveIds.length || "None"}</span>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <span className="text-slate-655 italic">No mission objectives registered.</span>
                     )}
