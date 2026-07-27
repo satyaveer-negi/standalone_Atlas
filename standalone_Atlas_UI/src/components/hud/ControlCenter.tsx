@@ -204,6 +204,13 @@ import type { OptimizationRecommendation } from "../../services/intelligence/opt
 import type { OptimizationExperiment } from "../../services/intelligence/optimization/OptimizationExperiment";
 import type { StrategyEvaluator } from "../../services/intelligence/optimization/StrategyEvaluator";
 import type { PortfolioEvolutionPlan } from "../../services/intelligence/optimization/PortfolioEvolutionPlan";
+import { activeStrategyRepository } from "../../services/intelligence/repository/StrategyRepository";
+import type { StrategicObjective } from "../../services/intelligence/strategy/StrategicObjective";
+import type { KnowledgeAsset } from "../../services/intelligence/strategy/KnowledgeAsset";
+import type { CapabilityMaturityModel } from "../../services/intelligence/strategy/CapabilityMaturityModel";
+import type { StrategicInvestmentPlan } from "../../services/intelligence/strategy/StrategicInvestmentPlan";
+import type { TechnologyRoadmap } from "../../services/intelligence/strategy/TechnologyRoadmap";
+import type { InnovationPortfolio } from "../../services/intelligence/strategy/InnovationPortfolio";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -419,6 +426,12 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [optimizationExperiments, setOptimizationExperiments] = useState<OptimizationExperiment[]>([]);
   const [strategyEvaluations, setStrategyEvaluations] = useState<StrategyEvaluator[]>([]);
   const [portfolioEvolutionPlans, setPortfolioEvolutionPlans] = useState<PortfolioEvolutionPlan[]>([]);
+  const [strategicObjectives, setStrategicObjectives] = useState<StrategicObjective[]>([]);
+  const [knowledgeAssets, setKnowledgeAssets] = useState<KnowledgeAsset[]>([]);
+  const [capabilityModels, setCapabilityModels] = useState<CapabilityMaturityModel[]>([]);
+  const [strategicInvestmentPlans, setStrategicInvestmentPlans] = useState<StrategicInvestmentPlan[]>([]);
+  const [technologyRoadmaps, setTechnologyRoadmaps] = useState<TechnologyRoadmap[]>([]);
+  const [innovationPortfolios, setInnovationPortfolios] = useState<InnovationPortfolio[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2488,6 +2501,157 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerStrategicPlanning = () => {
+    const objectiveId = `obj-${Date.now()}`;
+    
+    // 1. Register Strategic Objective
+    const so: StrategicObjective = {
+      objectiveId,
+      title: "Scale Dynamic Wind Yield Capacity",
+      description: "Increase dynamic wind field energy conversion efficiency metrics",
+      targetKPIs: ["Convert yield efficiency rate >= 85%", "Reduce mechanical fatigue rate by 15%"],
+      targetDate: "2030-12-31",
+      currentProgress: 35,
+      owner: "Strategic Leadership Council"
+    };
+    activeStrategyRepository.saveObjective(so);
+
+    // 2. Register Capability Maturity
+    const cm: CapabilityMaturityModel = {
+      capabilityId: `cap-${Date.now()}`,
+      organizationId: "org-wind-corp-01",
+      capabilityName: "Dynamic Blade Loading Analytics",
+      currentLevel: "Defined",
+      targetLevel: "Quantitatively Managed",
+      assessmentDate: new Date().toISOString(),
+      improvementActions: ["Deploy microgrid blade sensory analytics arrays"],
+      assessmentEvidence: ["blade-load-audit-results-24"],
+      confidence: 94.2
+    };
+    activeStrategyRepository.saveModel(cm);
+
+    // 3. Technology Roadmap Milestones
+    const roadmapId = `roadmap-${Date.now()}`;
+    const tr: TechnologyRoadmap = {
+      roadmapId,
+      technologyArea: "Microgrid Telemetry Sensing",
+      currentState: "Wired telemetry loops",
+      futureState: "Autonomous wireless dynamic blade load adjustments",
+      milestones: [
+        {
+          id: "m1",
+          name: "Sensing Prototype Lab Trial",
+          plannedDate: "2026-06-30",
+          status: "Completed",
+          dependencies: [],
+          completionPercentage: 100
+        },
+        {
+          id: "m2",
+          name: "Microgrid Active Field Pilot Deployment",
+          plannedDate: "2027-06-30",
+          status: "Planned",
+          dependencies: ["m1"],
+          completionPercentage: 0
+        }
+      ],
+      targetDate: "2028-12-31",
+      owner: "R&D Labs Division",
+      riskAssessment: "Low risk of sensor interference over 5G spectrum bands"
+    };
+    activeStrategyRepository.saveRoadmap(tr);
+
+    // Refresh UI States
+    setStrategicObjectives(activeStrategyRepository.getObjectivesList());
+    setCapabilityModels(activeStrategyRepository.getModelsList());
+    setTechnologyRoadmaps(activeStrategyRepository.getRoadmapsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Strategic Planning] Initialized Strategic Objective: ${so.title}. Capability target: ${cm.capabilityName} ➔ ${cm.targetLevel}. Roadmap registered for ${tr.technologyArea}.`
+    ]);
+  };
+
+  const handleTriggerStrategicInvestment = () => {
+    if (strategicObjectives.length === 0) {
+      setMockLogs(prev => [...prev, `[Strategic Alert] Error: No strategic objectives registered. Click Launch Planning first.`]);
+      return;
+    }
+
+    const latestObjective = strategicObjectives[strategicObjectives.length - 1];
+
+    // 1. Publish Knowledge Asset
+    const assetId = `asset-${Date.now()}`;
+    const ka: KnowledgeAsset = {
+      knowledgeAssetId: assetId,
+      title: "Self-Stabilizing Turbine Governor Loop Algorithm",
+      description: "High reliability governor loop design template matching NetZero standards",
+      domain: "Control Systems",
+      knowledgeType: "Algorithm",
+      owner: "Assurance Engineering Team",
+      organizationId: "org-wind-corp-01",
+      sourceArtifacts: ["governor-audit-2025.pdf"],
+      trustScore: 95.8,
+      reuseScore: 84.5,
+      maturityLevel: 5,
+      lifecycleState: "Published",
+      knowledgeValue: {
+        engineeringImpact: 9.0,
+        reuseSavings: 45000,
+        strategicImportance: 9.2
+      },
+      strategicObjectiveId: latestObjective.objectiveId,
+      createdDate: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+    activeStrategyRepository.saveAsset(ka);
+
+    // 2. Propose Investment Plan
+    const investmentPlanId = `plan-${Date.now()}`;
+    const sip: StrategicInvestmentPlan = {
+      investmentPlanId,
+      title: "Wind Microgrid Sensor Networks Investment",
+      organizationId: "org-wind-corp-01",
+      investmentArea: "Infrastructure",
+      estimatedCost: 250000,
+      expectedROI: 3.2,
+      expectedImpact: "Provides live sensory feedback telemetry, raising load maturity metrics",
+      priority: "High",
+      investmentHorizon: "MidTerm",
+      dependencies: [],
+      strategicObjectiveId: latestObjective.objectiveId,
+      approvalStatus: "Approved"
+    };
+    activeStrategyRepository.savePlan(sip);
+
+    // 3. Innovation project
+    const innovationId = `innov-${Date.now()}`;
+    const ip: InnovationPortfolio = {
+      innovationId,
+      title: "Turbine dynamic governor loop prototype",
+      organizationId: "org-wind-corp-01",
+      innovationType: "Prototype",
+      researchArea: "Autonomous Governors Control Loops",
+      technologyReadinessLevel: 6,
+      expectedValue: 850000,
+      riskLevel: "Medium",
+      innovationOutcome: "Internal Adoption",
+      strategicObjectiveId: latestObjective.objectiveId,
+      status: "Active"
+    };
+    activeStrategyRepository.saveInnovation(ip);
+
+    // Refresh UI States
+    setKnowledgeAssets(activeStrategyRepository.getAssetsList());
+    setStrategicInvestmentPlans(activeStrategyRepository.getPlansList());
+    setInnovationPortfolios(activeStrategyRepository.getInnovationsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Strategic Investment] Published Asset (${ka.title}, Savings: $${ka.knowledgeValue.reuseSavings}). Approved Strategic Investment Plan (${sip.title}, ROI: ${sip.expectedROI}x). Registered Innovation project (TRL: ${ip.technologyReadinessLevel}).`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -2831,6 +2995,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🧠 Optimization Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("strategicIntelligence")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "strategicIntelligence"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🏛️ Strategic Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -7671,6 +7845,206 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-650 italic">No evolution plans registered. Propose evolution.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+            </div>
+          )}
+
+          {activeTab === "strategicIntelligence" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🏛️ ENTERPRISE STRATEGIC INTELLIGENCE STUDIO</h3>
+                  <p className="text-[10px] text-slate-505">Governing strategic investment portfolios, capability maturity metrics progression, technology milestones roadmaps, and knowledge economies value indexes</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerStrategicPlanning}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Launch Planning
+                  </button>
+                  <button
+                    onClick={handleTriggerStrategicInvestment}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Deploy Investment
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Strategy & Objectives Dashboard */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Strategic Objectives Mappings</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {strategicObjectives.length > 0 ? (
+                      [...strategicObjectives].reverse().map(obj => (
+                        <div key={obj.objectiveId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                          <span className="text-cyan-300 font-bold">{obj.title}</span>
+                          <p className="text-[7.5px] text-slate-450 italic">"{obj.description}"</p>
+                          <div className="w-full bg-slate-950 h-1 rounded overflow-hidden my-1">
+                            <div className="bg-cyan-500 h-full" style={{ width: `${obj.currentProgress}%` }}></div>
+                          </div>
+                          <div className="text-[7px] text-slate-500 flex justify-between">
+                            <span>Owner: {obj.owner}</span>
+                            <span>Target: {obj.targetDate}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No strategic objectives mapped. Click Launch Planning.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Knowledge Economy */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Reusable Knowledge Assets & Value Savings Index</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {knowledgeAssets.length > 0 ? (
+                      [...knowledgeAssets].reverse().map(asset => (
+                        <div key={asset.knowledgeAssetId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">{asset.title} ({asset.knowledgeType})</span>
+                            <span className="text-purple-400">Maturity: Lvl {asset.maturityLevel}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-400 italic">"{asset.description}"</p>
+                          <div className="flex gap-3 text-[7px] text-slate-500 border-t border-slate-850 pt-1 mt-1 font-sans">
+                            <span>Trust Score: <strong className="text-emerald-400">{asset.trustScore}%</strong></span>
+                            <span>Reuse Score: <strong className="text-emerald-400">{asset.reuseScore}%</strong></span>
+                            <span>Savings: <strong className="text-purple-400">${asset.knowledgeValue.reuseSavings}</strong></span>
+                            <span>Impact: <strong className="text-purple-400">{asset.knowledgeValue.engineeringImpact}/10</strong></span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No knowledge assets published. Deploy investment to compile assets.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Capability Maturity Matrix */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Capability Maturity Progression</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {capabilityModels.length > 0 ? (
+                      [...capabilityModels].reverse().map(cm => (
+                        <div key={cm.capabilityId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <span className="text-cyan-300 font-bold">{cm.capabilityName}</span>
+                          <div className="text-[7.5px] text-slate-300 space-y-1 mt-1">
+                            <div className="flex justify-between">
+                              <span>Current Level:</span>
+                              <span className="text-purple-450 font-bold">{cm.currentLevel}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Target Level:</span>
+                              <span className="text-emerald-450 font-bold">{cm.targetLevel}</span>
+                            </div>
+                            <div className="text-[7px] text-slate-550 border-t border-slate-850/40 pt-1">
+                              <div>Evidence: {cm.assessmentEvidence.join(", ")}</div>
+                              <div>Confidence: {cm.confidence}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No capability models assessed.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Strategic Investment, technology milestones roadmaps, and innovation */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Strategic Investment Portfolio */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Strategic Budgets & Investment Horizon</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {strategicInvestmentPlans.length > 0 ? (
+                      [...strategicInvestmentPlans].reverse().map(plan => (
+                        <div key={plan.investmentPlanId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">{plan.title}</span>
+                            <span className="text-purple-400">{plan.investmentHorizon}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-400 space-y-0.5 font-sans">
+                            <div>Area: {plan.investmentArea}</div>
+                            <div>Cost: <span className="text-slate-200">${plan.estimatedCost}</span></div>
+                            <div>ROI Multiplier: <span className="text-emerald-400">{plan.expectedROI}x</span></div>
+                            <p className="text-[7px] text-slate-500 italic mt-1">Impact: "{plan.expectedImpact}"</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No strategic investments approved.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Technology Roadmaps */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Technology Milestone Roadmaps Progression Timeline</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {technologyRoadmaps.length > 0 ? (
+                      technologyRoadmaps.map(roadmap => (
+                        <div key={roadmap.roadmapId} className="bg-slate-900 p-2 border border-slate-850 rounded flex flex-col gap-1">
+                          <span className="font-bold text-cyan-300 text-[8.5px]">{roadmap.technologyArea}</span>
+                          <div className="text-[7.5px] text-slate-400 space-y-1 my-1">
+                            <div>Current: {roadmap.currentState} ➔ Target: {roadmap.futureState}</div>
+                            
+                            {/* Rich milestones timeline rendering */}
+                            <div className="space-y-1.5 mt-1.5 border-t border-slate-850/50 pt-1.5">
+                              {roadmap.milestones.map(m => (
+                                <div key={m.id} className="flex justify-between items-center text-[7px] bg-slate-950/40 p-1 rounded">
+                                  <div>
+                                    <span className="text-slate-300 font-bold">{m.name}</span>
+                                    <span className="text-slate-500 ml-1">({m.plannedDate})</span>
+                                  </div>
+                                  <span className={`px-1 rounded text-[6.5px] font-bold ${
+                                    m.status === "Completed" ? "bg-emerald-950 text-emerald-450" : "bg-cyan-950 text-cyan-455"
+                                  }`}>{m.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic col-span-2">No technology roadmaps mapped.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: R&D Innovation portfolio details */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-1">
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-3">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">6. R&D Innovation Portfolio & Technology Readiness Level (TRL) Scale</span>
+                  <div className="grid grid-cols-3 gap-3 mt-1">
+                    {innovationPortfolios.length > 0 ? (
+                      innovationPortfolios.map(ip => (
+                        <div key={ip.innovationId} className="bg-slate-900 p-2 border border-slate-850 rounded flex justify-between items-center gap-3">
+                          <div>
+                            <span className="font-bold text-cyan-300 block">{ip.title} ({ip.innovationType})</span>
+                            <div className="text-[7.5px] text-slate-500 mt-1">
+                              <div>Research Area: {ip.researchArea}</div>
+                              <div className="text-purple-400">Outcome Status: {ip.innovationOutcome}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="bg-purple-950 text-purple-450 px-2 py-0.5 rounded text-[8px] font-bold block mb-1">TRL {ip.technologyReadinessLevel}</span>
+                            <span className="text-slate-550 text-[7px] block">Valuation: ${ip.expectedValue}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic col-span-3">No innovation projects registered.</span>
                     )}
                   </div>
                 </div>
