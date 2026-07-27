@@ -198,6 +198,12 @@ import type { CrossMissionDependency } from "../../services/intelligence/portfol
 import type { ResourceAllocationPlan } from "../../services/intelligence/portfolio/ResourceAllocationPlan";
 import type { SystemOrchestrator } from "../../services/intelligence/portfolio/SystemOrchestrator";
 import type { PortfolioAssessment } from "../../services/intelligence/portfolio/PortfolioAssessment";
+import { activeOptimizationRepository } from "../../services/intelligence/repository/OptimizationRepository";
+import type { OptimizationProgram } from "../../services/intelligence/optimization/OptimizationProgram";
+import type { OptimizationRecommendation } from "../../services/intelligence/optimization/OptimizationRecommendation";
+import type { OptimizationExperiment } from "../../services/intelligence/optimization/OptimizationExperiment";
+import type { StrategyEvaluator } from "../../services/intelligence/optimization/StrategyEvaluator";
+import type { PortfolioEvolutionPlan } from "../../services/intelligence/optimization/PortfolioEvolutionPlan";
 import "../../services/kql/federatedQueryProvider";
 import "../../services/adapters/remoteExecutionProvider";
 
@@ -408,6 +414,11 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
   const [resourceAllocationPlans, setResourceAllocationPlans] = useState<ResourceAllocationPlan[]>([]);
   const [systemOrchestrators, setSystemOrchestrators] = useState<SystemOrchestrator[]>([]);
   const [portfolioAssessmentsList, setPortfolioAssessmentsList] = useState<PortfolioAssessment[]>([]);
+  const [optimizationPrograms, setOptimizationPrograms] = useState<OptimizationProgram[]>([]);
+  const [optimizationRecommendations, setOptimizationRecommendations] = useState<OptimizationRecommendation[]>([]);
+  const [optimizationExperiments, setOptimizationExperiments] = useState<OptimizationExperiment[]>([]);
+  const [strategyEvaluations, setStrategyEvaluations] = useState<StrategyEvaluator[]>([]);
+  const [portfolioEvolutionPlans, setPortfolioEvolutionPlans] = useState<PortfolioEvolutionPlan[]>([]);
 
   useEffect(() => {
     setPackages(activePackageRegistry.getPackagesList());
@@ -2356,6 +2367,127 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
     ]);
   };
 
+  const handleTriggerOptimizationProgram = () => {
+    const programId = `prog-${Date.now()}`;
+    
+    // 1. Create optimization program
+    const op: OptimizationProgram = {
+      optimizationProgramId: programId,
+      name: "Autonomous Grid Optimization Initiative",
+      description: "Evolving multi-mission resource schedules to optimize response bounds",
+      organizationId: "org-wind-corp-01",
+      portfolioIds: ["portfolio-mock-01"],
+      optimizationObjective: "Balanced",
+      optimizationScope: "Portfolio",
+      status: "Running",
+      createdDate: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+    activeOptimizationRepository.saveProgram(op);
+
+    // 2. Evaluate strategies
+    const evalBalanced: StrategyEvaluator = {
+      evaluationId: `eval-bal-${Date.now()}`,
+      portfolioId: "portfolio-mock-01",
+      strategy: "Balanced",
+      performanceScore: 92.5,
+      costScore: 90.0,
+      resilienceScore: 94.2,
+      riskScore: 10.5,
+      energyScore: 95.0,
+      sustainabilityScore: 96.0,
+      overallScore: 93.8
+    };
+    const evalCost: StrategyEvaluator = {
+      evaluationId: `eval-cost-${Date.now()}`,
+      portfolioId: "portfolio-mock-01",
+      strategy: "CostOptimized",
+      performanceScore: 84.0,
+      costScore: 98.2,
+      resilienceScore: 88.5,
+      riskScore: 18.0,
+      energyScore: 80.0,
+      sustainabilityScore: 82.0,
+      overallScore: 86.4
+    };
+    activeOptimizationRepository.saveEvaluator(evalBalanced);
+    activeOptimizationRepository.saveEvaluator(evalCost);
+
+    // Refresh UI States
+    setOptimizationPrograms(activeOptimizationRepository.getProgramsList());
+    setStrategyEvaluations(activeOptimizationRepository.getEvaluatorsList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Optimization Program] Launched program: ${op.name} (Objective: ${op.optimizationObjective}). Evaluated strategies scores: Balanced (${evalBalanced.overallScore}) vs Cost (${evalCost.overallScore}).`
+    ]);
+  };
+
+  const handleTriggerRecommendationExecution = () => {
+    if (optimizationPrograms.length === 0) {
+      setMockLogs(prev => [...prev, `[Optimization Alert] Error: No active programs. Launch Program first.`]);
+      return;
+    }
+
+    const latestProgram = optimizationPrograms[optimizationPrograms.length - 1];
+
+    // 1. Generate recommendation
+    const recId = `rec-${Date.now()}`;
+    const rec: OptimizationRecommendation = {
+      recommendationId: recId,
+      programId: latestProgram.optimizationProgramId,
+      recommendationType: "ResourceReallocation",
+      description: "Shift secondary backup GPU resources from turbine simulation tasks to grid loading",
+      expectedBenefit: "Reduces grid-frequency response time by 80ms",
+      estimatedCost: 1500,
+      confidence: 94.8,
+      affectedPortfolioIds: ["portfolio-mock-01"],
+      affectedMissionIds: ["mission-mock-01"],
+      implementationPriority: "Critical",
+      status: "Approved"
+    };
+    activeOptimizationRepository.saveRecommendation(rec);
+
+    // 2. Setup experiment
+    const expId = `exp-${Date.now()}`;
+    const exp: OptimizationExperiment = {
+      experimentId: expId,
+      recommendationId: recId,
+      experimentType: "Digital Twin",
+      baselineMetrics: ["Avg response time: 240ms"],
+      candidateMetrics: ["Avg response time: 160ms"],
+      evaluationStatus: "Succeeded",
+      winner: "Candidate",
+      confidence: 95.2,
+      evidenceSources: ["twin-telemetry-response-series-24"]
+    };
+    activeOptimizationRepository.saveExperiment(exp);
+
+    // 3. Propose Evolution Plan
+    const evolutionPlanId = `evo-${Date.now()}`;
+    const pe: PortfolioEvolutionPlan = {
+      evolutionPlanId,
+      portfolioId: "portfolio-mock-01",
+      currentVersion: 1,
+      proposedVersion: 2,
+      changes: ["Apply optimized GPU scheduler allocation mappings"],
+      expectedBenefits: ["Lower grid-telemetry query latencies"],
+      approvalStatus: "Approved",
+      rollbackPlan: ["Revert GPU dynamic affinity clamps to baseline configuration"]
+    };
+    activeOptimizationRepository.saveEvolutionPlan(pe);
+
+    // Refresh UI States
+    setOptimizationRecommendations(activeOptimizationRepository.getRecommendationsList());
+    setOptimizationExperiments(activeOptimizationRepository.getExperimentsList());
+    setPortfolioEvolutionPlans(activeOptimizationRepository.getEvolutionPlansList());
+
+    setMockLogs(prev => [
+      ...prev,
+      `[Optimization Opportunity] Proposes Evolution Plan ${pe.evolutionPlanId} (v${pe.currentVersion} ➔ v${pe.proposedVersion}). Verified via shadow experiment ${exp.experimentId} (Winner: ${exp.winner}).`
+    ]);
+  };
+
   const filteredEvents = filterCorrelationId
     ? activeWorkflowEventStore.getByCorrelation(filterCorrelationId)
     : workflowEvents;
@@ -2689,6 +2821,16 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
             }`}
           >
             🌐 Portfolio Studio
+          </button>
+          <button
+            onClick={() => setActiveTab("enterpriseOptimization")}
+            className={`w-full text-left px-3 py-1.5 rounded text-xs transition-all ${
+              activeTab === "enterpriseOptimization"
+                ? "bg-cyan-500/20 text-cyan-300 border-l-2 border-cyan-400 font-bold"
+                : "hover:bg-slate-800 text-slate-455 text-cyan-100"
+            }`}
+          >
+            🧠 Optimization Studio
           </button>
 
           {/* Group 4: Diagnostics */}
@@ -7327,6 +7469,208 @@ export function ControlCenter({ onClose }: ControlCenterProps) {
                       ))
                     ) : (
                       <span className="text-slate-655 italic">No operational orchestration strategy configured.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "enterpriseOptimization" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                <div>
+                  <h3 className="font-bold text-sm text-cyan-300">🧠 ENTERPRISE ENGINEERING OPTIMIZATION & AUTONOMOUS EVOLUTION</h3>
+                  <p className="text-[10px] text-slate-505">Evolving shared microgrid resources allocation policies, multi-objective scorecards, and shadow trials evidence verification</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleTriggerOptimizationProgram}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Launch Program
+                  </button>
+                  <button
+                    onClick={handleTriggerRecommendationExecution}
+                    className="bg-purple-900 hover:bg-purple-800 text-purple-100 font-bold px-3 py-1.5 rounded text-[10px] cursor-pointer whitespace-nowrap"
+                  >
+                    Propose Evolution
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 text-[9px] font-mono">
+                {/* 1. Active Programs */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">1. Optimization Initiatives</span>
+                  <div className="flex flex-col gap-1.5 mt-1 leading-tight text-slate-400">
+                    {optimizationPrograms.length > 0 ? (
+                      [...optimizationPrograms].reverse().map(op => (
+                        <div key={op.optimizationProgramId} className="bg-slate-900 p-2 border border-slate-855 rounded flex flex-col gap-1.5">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-300">{op.name}</span>
+                            <span className="text-purple-400">{op.status}</span>
+                          </div>
+                          <p className="text-[7.5px] text-slate-450 italic">"{op.description}"</p>
+                          <div className="text-[7px] text-slate-500 space-y-0.5 border-t border-slate-850/40 pt-1 mt-1">
+                            <div>Objective Target: <strong>{op.optimizationObjective}</strong></div>
+                            <div>Scope Level: {op.optimizationScope}</div>
+                            <div>Org Bounds: {op.organizationId}</div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No optimization initiatives configured. Click Launch Program.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Recommendations Queue */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">2. Optimization Recommendation Ledger Queue</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {optimizationRecommendations.length > 0 ? (
+                      [...optimizationRecommendations].reverse().map(rec => (
+                        <div key={rec.recommendationId} className="bg-slate-900 p-2 border border-slate-850 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-purple-400">{rec.recommendationType}</span>
+                            <span className={`px-1.5 rounded text-[7px] font-bold ${
+                              rec.implementationPriority === "Critical" ? "bg-red-950 text-red-400 border border-red-900/30" : "bg-cyan-950 text-cyan-400"
+                            }`}>
+                              Priority: {rec.implementationPriority}
+                            </span>
+                          </div>
+                          <p className="text-[8px] text-slate-200">"{rec.description}"</p>
+                          <p className="text-[7.5px] text-emerald-400 font-bold mt-1">Benefit: {rec.expectedBenefit}</p>
+                          <div className="flex justify-between text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1">
+                            <span>Cost: ${rec.estimatedCost}</span>
+                            <span>Confidence Interval: {rec.confidence}%</span>
+                            <span className="text-cyan-300 font-bold">Status: {rec.status}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic">No recommendations queued. Propose evolution to generate.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Shadow Experiments Tracker */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">3. Shadow Trial Verification (Digital Twins)</span>
+                  <div className="max-h-[110px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {optimizationExperiments.length > 0 ? (
+                      [...optimizationExperiments].reverse().map(exp => (
+                        <div key={exp.experimentId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal">
+                          <div className="flex justify-between font-bold text-[8px] mb-1">
+                            <span className="text-cyan-300">Exp: {exp.experimentId.substring(4, 10)}</span>
+                            <span className="text-purple-400">{exp.experimentType}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-300 space-y-0.5">
+                            <div className="text-slate-500">Baseline: <span className="text-slate-300 font-bold">{exp.baselineMetrics[0]}</span></div>
+                            <div className="text-purple-400">Candidate: <span className="text-slate-200 font-bold">{exp.candidateMetrics[0]}</span></div>
+                            <div>Status: <strong className="text-emerald-400">{exp.evaluationStatus}</strong></div>
+                            <div className="text-[7px] text-slate-500 border-t border-slate-850/40 pt-1 mt-1">
+                              <div>Winner: {exp.winner} (Conf: {exp.confidence}%)</div>
+                              <div className="text-purple-400 truncate">Evidence: {exp.evidenceSources.join(", ")}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No shadow runs tracked.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 2: Strategy evaluations scorecards and evolution plans rollbacks */}
+              <div className="grid grid-cols-3 gap-4 text-[9px] font-mono mt-2">
+                {/* Strategy scorecards comparison */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5 col-span-2">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">4. Multi-Objective Orchestration Strategy Comparison Card</span>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    {strategyEvaluations.length > 0 ? (
+                      strategyEvaluations.map(evalRes => (
+                        <div key={evalRes.evaluationId} className="bg-slate-900 p-2.5 border border-slate-850 rounded flex flex-col gap-1.5">
+                          <div className="flex justify-between font-bold text-[8.5px]">
+                            <span className="text-cyan-300">Strategy: {evalRes.strategy}</span>
+                            <span className="text-purple-400">Overall: {evalRes.overallScore}%</span>
+                          </div>
+                          
+                          {/* Score metrics progress meters */}
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[7.5px] mt-1 text-slate-450">
+                            <div>
+                              <div className="flex justify-between">
+                                <span>Performance:</span>
+                                <span className="text-slate-200">{evalRes.performanceScore}%</span>
+                              </div>
+                              <div className="w-full bg-slate-950 h-1 rounded overflow-hidden mt-0.5">
+                                <div className="bg-cyan-500 h-full" style={{ width: `${evalRes.performanceScore}%` }}></div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between">
+                                <span>Resilience:</span>
+                                <span className="text-slate-200">{evalRes.resilienceScore}%</span>
+                              </div>
+                              <div className="w-full bg-slate-950 h-1 rounded overflow-hidden mt-0.5">
+                                <div className="bg-purple-500 h-full" style={{ width: `${evalRes.resilienceScore}%` }}></div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between">
+                                <span>Sustainability:</span>
+                                <span className="text-slate-200">{evalRes.sustainabilityScore}%</span>
+                              </div>
+                              <div className="w-full bg-slate-950 h-1 rounded overflow-hidden mt-0.5">
+                                <div className="bg-emerald-500 h-full" style={{ width: `${evalRes.sustainabilityScore}%` }}></div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between">
+                                <span>Energy:</span>
+                                <span className="text-slate-200">{evalRes.energyScore}%</span>
+                              </div>
+                              <div className="w-full bg-slate-950 h-1 rounded overflow-hidden mt-0.5">
+                                <div className="bg-yellow-500 h-full" style={{ width: `${evalRes.energyScore}%` }}></div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-655 italic col-span-2">No strategy scorecards evaluated.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Portfolio Evolution & rollback cases */}
+                <div className="p-2.5 bg-slate-905 border border-slate-800 rounded flex flex-col gap-1.5">
+                  <span className="font-bold text-slate-350 block border-b border-slate-850 pb-1 text-[10px]">5. Portfolio Version Evolution & Recovery Plans</span>
+                  <div className="max-h-[120px] overflow-y-auto flex flex-col gap-1.5 mt-1">
+                    {portfolioEvolutionPlans.length > 0 ? (
+                      [...portfolioEvolutionPlans].reverse().map(pe => (
+                        <div key={pe.evolutionPlanId} className="bg-slate-900 p-2 border border-slate-855 rounded leading-normal flex flex-col gap-1">
+                          <div className="flex justify-between font-bold text-[8px]">
+                            <span className="text-cyan-300">Plan: {pe.evolutionPlanId.substring(4, 10)}</span>
+                            <span className="text-purple-400">v{pe.currentVersion} &rarr; v{pe.proposedVersion}</span>
+                          </div>
+                          <div className="text-[7.5px] text-slate-300 space-y-1">
+                            <div>Changes: <span className="text-slate-200">{pe.changes.join(", ")}</span></div>
+                            <div className="text-emerald-400">Benefit Target: {pe.expectedBenefits.join(", ")}</div>
+                            <div className="text-red-400">Rollback Target: {pe.rollbackPlan.join(", ")}</div>
+                            <div className="text-[7px] text-slate-500 mt-1 border-t border-slate-850 pt-1 flex justify-between">
+                              <span>Status: <strong className="text-cyan-300">{pe.approvalStatus}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-650 italic">No evolution plans registered. Propose evolution.</span>
                     )}
                   </div>
                 </div>
